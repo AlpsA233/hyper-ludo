@@ -34,6 +34,12 @@ export interface Card {
   instanceId?: number;
 }
 
+// 游戏事件进度范围
+export interface ProgressRange {
+  min: number; // 0-100，游戏进度百分比下限
+  max: number; // 0-100，游戏进度百分比上限
+}
+
 // 游戏事件
 export interface GameEvent {
   id: number;
@@ -42,6 +48,7 @@ export interface GameEvent {
   target: "SELF" | "ALL_PLAYERS" | "RANDOM_OTHER";
   val: number;
   color?: string; // 事件颜色标识
+  progressRange?: ProgressRange; // 允许出现的游戏进度范围（百分比）
 }
 
 // 玩家

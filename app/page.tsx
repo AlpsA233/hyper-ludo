@@ -472,8 +472,29 @@ export default function App() {
       addLog(`Player ${turn + 1} moved to pos ${finalPos} (lap ${newLap})`);
       if (finalPos !== -1 && boardTiles[finalPos]?.id === "CUSTOM") {
         setTimeout(() => {
+          // 计算当前游戏进度百分比 (0-100)
+          const totalLaps = lapsToWin;
+          const currentProgress = (newLap / totalLaps) * 100;
+
+          // 筛选当前进度允许的事件
+          const allowedEvents = eventDatabase.filter((evt) => {
+            // 如果progressRange未定义，表示全程都允许
+            if (!evt.progressRange) return true;
+            // 否则检查当前进度是否在范围内
+            return (
+              currentProgress >= evt.progressRange.min &&
+              currentProgress <= evt.progressRange.max
+            );
+          });
+          // 如果没有允许的事件，跳过事件触发
+          if (allowedEvents.length === 0) {
+            setIsMoving(false);
+            setTurn((turn + 1) % numPlayers);
+            setHasUsedCard(false);
+            return;
+          }
           const event =
-            eventDatabase[Math.floor(Math.random() * eventDatabase.length)];
+            allowedEvents[Math.floor(Math.random() * allowedEvents.length)];
           addLog(`Player ${turn + 1} triggered: ${event.text}`);
           setActiveEvent({
             id: event.id,

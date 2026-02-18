@@ -37,6 +37,7 @@ export default function EventEditor({
     target: "SELF",
     val: 0,
     color: EVENT_COLORS[0].value,
+    progressRange: { min: 0, max: 100 },
   });
 
   const save = () => {
@@ -52,6 +53,7 @@ export default function EventEditor({
         target: "SELF",
         val: 0,
         color: EVENT_COLORS[0].value,
+        progressRange: { min: 0, max: 100 },
       });
     }
   };
@@ -128,6 +130,70 @@ export default function EventEditor({
                   />
                 ))}
               </div>
+            </div>
+
+            {/* Progress Range Selection */}
+            <div>
+              <label className="text-[10px] text-gray-500 block mb-3">
+                游戏进度范围 ({newItem.progressRange?.min || 0}% -{" "}
+                {newItem.progressRange?.max || 100}%)
+              </label>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-[9px] text-gray-600">开始</span>
+                    <span className="text-sm font-bold text-cyan-400">
+                      {newItem.progressRange?.min || 0}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={newItem.progressRange?.min || 0}
+                    onChange={(e) => {
+                      const min = parseInt(e.target.value);
+                      const max = newItem.progressRange?.max || 100;
+                      if (min <= max) {
+                        setNewItem({
+                          ...newItem,
+                          progressRange: { min, max },
+                        });
+                      }
+                    }}
+                    className="w-full h-2 bg-black/40 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                  />
+                </div>
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-[9px] text-gray-600">结束</span>
+                    <span className="text-sm font-bold text-cyan-400">
+                      {newItem.progressRange?.max || 100}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={newItem.progressRange?.max || 100}
+                    onChange={(e) => {
+                      const max = parseInt(e.target.value);
+                      const min = newItem.progressRange?.min || 0;
+                      if (max >= min) {
+                        setNewItem({
+                          ...newItem,
+                          progressRange: { min, max },
+                        });
+                      }
+                    }}
+                    className="w-full h-2 bg-black/40 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                  />
+                </div>
+              </div>
+              <p className="text-[9px] text-gray-600 mt-3">
+                事件在游戏进度 {newItem.progressRange?.min || 0}% 到{" "}
+                {newItem.progressRange?.max || 100}% 时可能出现
+              </p>
             </div>
 
             {/* Target Selection */}
@@ -233,7 +299,7 @@ export default function EventEditor({
                     <div className="font-bold text-sm text-white mb-2">
                       {item.text}
                     </div>
-                    <div className="flex items-center gap-3 text-[9px] text-gray-500 uppercase tracking-wide">
+                    <div className="flex items-center gap-3 text-[9px] text-gray-500 uppercase tracking-wide flex-wrap">
                       <span
                         className="px-2 py-1 rounded"
                         style={{
@@ -247,6 +313,15 @@ export default function EventEditor({
                         {item.type}
                         {item.val !== 0 && ` (${item.val})`}
                       </span>
+                      {item.progressRange && (
+                        <>
+                          <span className="text-gray-600">·</span>
+                          <span className="text-green-400">
+                            进度 {item.progressRange.min}-
+                            {item.progressRange.max}%
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
                   <button

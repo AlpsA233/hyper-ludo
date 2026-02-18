@@ -89,6 +89,7 @@ export const DEFAULT_EVENT_DB: GameEvent[] = [
     target: "SELF",
     val: 2,
     color: "#10b981",
+    progressRange: { min: 0, max: 100 },
   },
   {
     id: 2,
@@ -97,6 +98,7 @@ export const DEFAULT_EVENT_DB: GameEvent[] = [
     target: "SELF",
     val: 0,
     color: "#f59e0b",
+    progressRange: { min: 0, max: 100 },
   },
   {
     id: 3,
@@ -105,6 +107,7 @@ export const DEFAULT_EVENT_DB: GameEvent[] = [
     target: "SELF",
     val: 0,
     color: "#8b5cf6",
+    progressRange: { min: 0, max: 100 },
   },
   {
     id: 4,
@@ -113,5 +116,6 @@ export const DEFAULT_EVENT_DB: GameEvent[] = [
     target: "SELF",
     val: 0,
     color: "#ef4444",
+    progressRange: { min: 0, max: 100 },
   },
 ];
