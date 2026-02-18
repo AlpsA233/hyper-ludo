@@ -540,7 +540,8 @@ const fr: Translations = {
     gameSettings: "Paramètres du jeu",
     configManager: "Import/Export de configuration",
     stepByStepAlert: "Alerte Étape par Étape",
-    stepByStepAlertDesc: "Les événements peuvent être déclenchés à chaque étape",
+    stepByStepAlertDesc:
+      "Les événements peuvent être déclenchés à chaque étape",
     startGame: "Commencer le jeu",
   },
   settings: {

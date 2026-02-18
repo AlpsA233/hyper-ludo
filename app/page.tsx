@@ -680,7 +680,9 @@ export default function App() {
             onManageConfig={() => setPhase("config_manager")}
             onStartGame={startGame}
             triggerEventEveryStep={triggerEventEveryStep}
-            onToggleTriggerEventEveryStep={() => setTriggerEventEveryStep(!triggerEventEveryStep)}
+            onToggleTriggerEventEveryStep={() =>
+              setTriggerEventEveryStep(!triggerEventEveryStep)
+            }
             t={t}
           />
         )}

@@ -80,7 +80,7 @@ export default function GameSetup({
             />
           </div>
         </div>
-        
+
         {/* 每步触发事件模式 */}
         <div className="bg-white/5 border border-white/10 rounded-lg p-3 flex items-center justify-between">
           <div className="flex-1">
@@ -88,7 +88,9 @@ export default function GameSetup({
               {t.setup.stepByStepAlert}
             </label>
             <span className="text-[9px] text-gray-500">
-              {triggerEventEveryStep ? t.setup.stepByStepAlertDesc : `禁用：仅在特殊格子触发事件`}
+              {triggerEventEveryStep
+                ? t.setup.stepByStepAlertDesc
+                : `禁用：仅在特殊格子触发事件`}
             </span>
           </div>
           <button
