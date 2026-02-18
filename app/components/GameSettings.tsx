@@ -1,0 +1,358 @@
+"use client";
+
+import React, { useState, useEffect, useRef } from "react";
+import {
+  Save,
+  X,
+  Palette,
+  Image as ImageIcon,
+  User,
+  Upload,
+  Loader,
+} from "lucide-react";
+import { uploadImageToLskyPro } from "@/app/lib/lskyPro";
+import type { Translations } from "@/app/locales";
+
+interface GameSettingsProps {
+  onSave: () => void;
+  onCancel: () => void;
+  t: Translations;
+}
+
+const PRESET_COLORS = [
+  "#050510",
+  "#1a0b2e",
+  "#16213e",
+  "#0f3460",
+  "#533483",
+  "#2d4059",
+  "#1f1f1f",
+  "#2c003e",
+];
+
+const DEFAULT_EMOJIS = [
+  "👤",
+  "😀",
+  "😎",
+  "🤖",
+  "👻",
+  "🐶",
+  "🐱",
+  "🦊",
+  "🐼",
+  "🦁",
+  "🐯",
+  "🐸",
+  "🦄",
+  "🐉",
+  "🎮",
+  "⚡",
+  "🔥",
+  "💎",
+  "🌟",
+  "🎯",
+];
+
+export default function GameSettings({
+  onSave,
+  onCancel,
+  t,
+}: GameSettingsProps) {
+  const [bgType, setBgType] = useState<"color" | "image">("color");
+  const [bgValue, setBgValue] = useState("#050510");
+  const [avatars, setAvatars] = useState<string[]>(Array(8).fill("👤"));
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [editingAvatarIndex, setEditingAvatarIndex] = useState<number | null>(
+    null,
+  );
+  const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  useEffect(() => {
+    // 加载现有设置
+    const savedBg = localStorage.getItem("hyper_ludo_background");
+    if (savedBg) {
+      const parsed = JSON.parse(savedBg);
+      setBgType(parsed.type);
+      setBgValue(parsed.value);
+    }
+    const savedAvatars = localStorage.getItem("hyper_ludo_avatars");
+    if (savedAvatars) {
+      setAvatars(JSON.parse(savedAvatars));
+    }
+  }, []);
+
+  const handleSave = () => {
+    // 保存背景设置
+    localStorage.setItem(
+      "hyper_ludo_background",
+      JSON.stringify({ type: bgType, value: bgValue }),
+    );
+    // 保存头像设置
+    localStorage.setItem("hyper_ludo_avatars", JSON.stringify(avatars));
+    onSave();
+  };
+
+  const updateAvatar = (playerIndex: number, avatar: string) => {
+    const newAvatars = [...avatars];
+    newAvatars[playerIndex] = avatar;
+    setAvatars(newAvatars);
+  };
+
+  const handleFileUpload = async (playerIndex: number, file: File) => {
+    setUploadError(null);
+    setUploading(true);
+    try {
+      const url = await uploadImageToLskyPro(file);
+      updateAvatar(playerIndex, url);
+      setEditingAvatarIndex(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "上传失败";
+      setUploadError(message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleBackgroundUpload = async (file: File) => {
+    setUploadError(null);
+    setUploading(true);
+    try {
+      const url = await uploadImageToLskyPro(file);
+      setBgValue(url);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "上传失败";
+      setUploadError(message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="fixed top-16 left-0 right-0 bottom-0 z-[100] bg-[#050510] flex flex-col animate-fade-in overflow-hidden">
+      <div className="flex justify-between items-center p-6 border-b border-white/10 bg-black/60 flex-shrink-0">
+        <h2 className="text-xl font-bold flex items-center gap-2">
+          <Palette className="text-cyan-400" /> 游戏设置
+        </h2>
+        <div className="flex gap-2">
+          <button
+            onClick={onCancel}
+            className="w-10 h-10 rounded-lg flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
+            <X size={20} />
+          </button>
+          <button
+            onClick={handleSave}
+            className="bg-cyan-600 hover:bg-cyan-500 px-6 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors">
+            <Save size={18} /> 保存
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="max-w-4xl mx-auto space-y-8">
+          {/* 错误提示 */}
+          {uploadError && (
+            <div className="bg-red-600/20 border border-red-500 rounded-lg px-4 py-3 text-red-300 text-sm flex items-center justify-between">
+              <span>{uploadError}</span>
+              <button
+                onClick={() => setUploadError(null)}
+                className="text-red-300 hover:text-red-200">
+                <X size={16} />
+              </button>
+            </div>
+          )}
+          {/* 背景设置 */}
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+              <ImageIcon size={20} className="text-purple-400" />
+              背景设置
+            </h3>
+
+            <div className="space-y-4">
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setBgType("color")}
+                  className={`flex-1 py-3 rounded-xl font-bold transition-all ${
+                    bgType === "color"
+                      ? "bg-purple-600 text-white"
+                      : "bg-white/5 text-gray-400 hover:bg-white/10"
+                  }`}>
+                  纯色背景
+                </button>
+                <button
+                  onClick={() => setBgType("image")}
+                  className={`flex-1 py-3 rounded-xl font-bold transition-all ${
+                    bgType === "image"
+                      ? "bg-purple-600 text-white"
+                      : "bg-white/5 text-gray-400 hover:bg-white/10"
+                  }`}>
+                  图片背景
+                </button>
+              </div>
+
+              {bgType === "color" && (
+                <div className="space-y-3">
+                  <label className="text-sm text-gray-400">选择预设颜色</label>
+                  <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
+                    {PRESET_COLORS.map((color) => (
+                      <button
+                        key={color}
+                        onClick={() => setBgValue(color)}
+                        className={`h-12 rounded-lg transition-all border-2 ${
+                          bgValue === color
+                            ? "border-white scale-110 shadow-lg"
+                            : "border-transparent hover:border-white/30"
+                        }`}
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm text-gray-400">
+                      或输入颜色代码：
+                    </label>
+                    <input
+                      type="text"
+                      value={bgValue}
+                      onChange={(e) => setBgValue(e.target.value)}
+                      placeholder="#000000"
+                      className="flex-1 bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-purple-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {bgType === "image" && (
+                <div>
+                  <label className="text-sm text-gray-400 block mb-2">
+                    图片 URL 或上传图片
+                  </label>
+                  <div className="space-y-3">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={bgValue}
+                        onChange={(e) => setBgValue(e.target.value)}
+                        placeholder="https://example.com/image.jpg"
+                        className="flex-1 bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-purple-500"
+                      />
+                      <button
+                        onClick={() =>
+                          document.getElementById("bg-file-input")?.click()
+                        }
+                        disabled={uploading}
+                        className="px-4 py-2 rounded-lg bg-purple-600/50 hover:bg-purple-600 border border-purple-500 text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50">
+                        {uploading ? (
+                          <Loader size={16} className="animate-spin" />
+                        ) : (
+                          <Upload size={16} />
+                        )}
+                        上传
+                      </button>
+                      <input
+                        id="bg-file-input"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files?.[0]) {
+                            handleBackgroundUpload(e.target.files[0]);
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-2">
+                    提示：推荐使用高分辨率图片，支持 jpg, png, webp 格式
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 玩家头像设置 */}
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+              <User size={20} className="text-cyan-400" />
+              玩家头像
+            </h3>
+
+            <div className="space-y-4">
+              {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+                <div
+                  key={i}
+                  className="bg-black/20 rounded-xl p-4 border border-white/5">
+                  <div className="flex items-center gap-4 mb-3">
+                    <div
+                      className="w-12 h-12 rounded-full flex items-center justify-center text-2xl border-2 flex-shrink-0 relative group cursor-pointer transition-opacity hover:opacity-75"
+                      style={{
+                        borderColor: `hsl(${(i * 360) / 8}, 70%, 60%)`,
+                        backgroundColor: `hsl(${(i * 360) / 8}, 70%, 20%)`,
+                      }}>
+                      {avatars[i].startsWith("http") ? (
+                        <img
+                          src={avatars[i]}
+                          alt={`Player ${i + 1}`}
+                          className="w-full h-full rounded-full object-cover"
+                        />
+                      ) : (
+                        avatars[i]
+                      )}
+                      <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Upload size={16} className="text-white" />
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold">玩家 {i + 1}</div>
+                      <input
+                        type="text"
+                        value={avatars[i]}
+                        onChange={(e) => updateAvatar(i, e.target.value)}
+                        placeholder="输入 emoji 或图片 URL"
+                        className="w-full bg-black/40 border border-white/10 rounded px-3 py-1 text-xs mt-1 outline-none focus:border-cyan-500"
+                      />
+                      <button
+                        onClick={() => fileInputRefs.current[i]?.click()}
+                        disabled={uploading}
+                        className="mt-2 text-xs px-3 py-1 rounded bg-cyan-600/50 hover:bg-cyan-600 border border-cyan-500 text-white flex items-center gap-1 transition-colors disabled:opacity-50">
+                        {uploading ? (
+                          <Loader size={12} className="animate-spin" />
+                        ) : (
+                          <Upload size={12} />
+                        )}
+                        上传头像
+                      </button>
+                      <input
+                        ref={(el) => {
+                          fileInputRefs.current[i] = el;
+                        }}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files?.[0]) {
+                            handleFileUpload(i, e.target.files[0]);
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {DEFAULT_EMOJIS.map((emoji) => (
+                      <button
+                        key={emoji}
+                        onClick={() => updateAvatar(i, emoji)}
+                        className="w-10 h-10 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 transition-all text-xl flex items-center justify-center">
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
