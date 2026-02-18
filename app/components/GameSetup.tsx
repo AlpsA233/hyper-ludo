@@ -15,12 +15,14 @@ interface GameSetupProps {
   lapsToWin: number;
   cardCount: number;
   eventCount: number;
+  triggerEventEveryStep: boolean;
   onNumPlayersChange: (num: number) => void;
   onLapsToWinChange: (laps: number) => void;
   onEditCards: () => void;
   onEditEvents: () => void;
   onOpenSettings: () => void;
   onManageConfig: () => void;
+  onToggleTriggerEventEveryStep: () => void;
   onStartGame: () => void;
   t: Translations;
 }
@@ -30,12 +32,14 @@ export default function GameSetup({
   lapsToWin,
   cardCount,
   eventCount,
+  triggerEventEveryStep,
   onNumPlayersChange,
   onLapsToWinChange,
   onEditCards,
   onEditEvents,
   onOpenSettings,
   onManageConfig,
+  onToggleTriggerEventEveryStep,
   onStartGame,
   t,
 }: GameSetupProps) {
@@ -76,6 +80,32 @@ export default function GameSetup({
             />
           </div>
         </div>
+        
+        {/* 每步触发事件模式 */}
+        <div className="bg-white/5 border border-white/10 rounded-lg p-3 flex items-center justify-between">
+          <div className="flex-1">
+            <label className="text-xs font-bold text-white block mb-1">
+              {t.setup.stepByStepAlert}
+            </label>
+            <span className="text-[9px] text-gray-500">
+              {triggerEventEveryStep ? t.setup.stepByStepAlertDesc : `禁用：仅在特殊格子触发事件`}
+            </span>
+          </div>
+          <button
+            onClick={onToggleTriggerEventEveryStep}
+            className={`ml-3 w-12 h-6 rounded-full transition-all ${
+              triggerEventEveryStep
+                ? "bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]"
+                : "bg-white/10"
+            }`}>
+            <div
+              className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                triggerEventEveryStep ? "translate-x-6" : "translate-x-0.5"
+              }`}
+            />
+          </button>
+        </div>
+
         <div className="flex flex-col gap-2 pt-2">
           <button
             onClick={onOpenSettings}

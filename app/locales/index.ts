@@ -20,6 +20,8 @@ export interface Translations {
     eventLibrary: string;
     gameSettings: string;
     configManager: string;
+    stepByStepAlert: string;
+    stepByStepAlertDesc: string;
     startGame: string;
   };
 
@@ -156,6 +158,8 @@ const zh: Translations = {
     eventLibrary: "冒险事件",
     gameSettings: "游戏设置",
     configManager: "配置导入导出",
+    stepByStepAlert: "步步惊心",
+    stepByStepAlertDesc: "每一步都可能触发事件",
     startGame: "启动任务",
   },
   settings: {
@@ -280,6 +284,8 @@ const en: Translations = {
     eventLibrary: "Adventure Events",
     gameSettings: "Game Settings",
     configManager: "Config Import/Export",
+    stepByStepAlert: "Step by Step Alert",
+    stepByStepAlertDesc: "Event can trigger every step",
     startGame: "Start Game",
   },
   settings: {
@@ -405,6 +411,8 @@ const ja: Translations = {
     eventLibrary: "アドベンチャーイベント",
     gameSettings: "ゲーム設定",
     configManager: "設定のインポート/エクスポート",
+    stepByStepAlert: "ステップバイステップアラート",
+    stepByStepAlertDesc: "各ステップでイベントがトリガーされる可能性があります",
     startGame: "ゲーム開始",
   },
   settings: {
@@ -531,6 +539,8 @@ const fr: Translations = {
     eventLibrary: "Événements d'aventure",
     gameSettings: "Paramètres du jeu",
     configManager: "Import/Export de configuration",
+    stepByStepAlert: "Alerte Étape par Étape",
+    stepByStepAlertDesc: "Les événements peuvent être déclenchés à chaque étape",
     startGame: "Commencer le jeu",
   },
   settings: {

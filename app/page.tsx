@@ -96,6 +96,7 @@ export default function App() {
   const [numPlayers, setNumPlayers] = useState(4);
   const [lapsToWin, setLapsToWin] = useState(3);
   const [initialCards, setInitialCards] = useState(5);
+  const [triggerEventEveryStep, setTriggerEventEveryStep] = useState(false);
   const [players, setPlayers] = useState<Player[]>([]);
   const [turn, setTurn] = useState(0);
   const [diceValue, setDiceValue] = useState(1);
@@ -470,7 +471,12 @@ export default function App() {
         return next;
       });
       addLog(`Player ${turn + 1} moved to pos ${finalPos} (lap ${newLap})`);
-      if (finalPos !== -1 && boardTiles[finalPos]?.id === "CUSTOM") {
+      // 触发事件：CUSTOM格子 或 触发每步事件模式
+      const shouldTriggerEvent =
+        (finalPos !== -1 && boardTiles[finalPos]?.id === "CUSTOM") ||
+        (triggerEventEveryStep && finalPos !== -1);
+
+      if (shouldTriggerEvent) {
         setTimeout(() => {
           // 计算当前游戏进度百分比 (0-100)
           const totalLaps = lapsToWin;
@@ -673,6 +679,8 @@ export default function App() {
             onOpenSettings={() => setPhase("settings")}
             onManageConfig={() => setPhase("config_manager")}
             onStartGame={startGame}
+            triggerEventEveryStep={triggerEventEveryStep}
+            onToggleTriggerEventEveryStep={() => setTriggerEventEveryStep(!triggerEventEveryStep)}
             t={t}
           />
         )}
@@ -910,6 +918,7 @@ export default function App() {
                       : -1;
                   const isCustom = tile?.id === "CUSTOM";
                   const isStart = startPIdx >= 0;
+                  const shouldShowAsEvent = triggerEventEveryStep && !isStart;
 
                   let fill = "rgba(255,255,255,0.25)";
                   let stroke = "none";
@@ -920,7 +929,7 @@ export default function App() {
                     fill = COLORS[startPIdx].hex;
                     radius = 8;
                     filter = "url(#glow)";
-                  } else if (isCustom) {
+                  } else if (isCustom || shouldShowAsEvent) {
                     fill = "#D355FF";
                     radius = 5;
                     filter = "url(#glow)";
