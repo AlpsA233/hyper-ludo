@@ -61,6 +61,11 @@ export default function GameSettings({
   const [bgType, setBgType] = useState<"color" | "image">("color");
   const [bgValue, setBgValue] = useState("#050510");
   const [avatars, setAvatars] = useState<string[]>(Array(8).fill("👤"));
+  const [playerNames, setPlayerNames] = useState<string[]>(
+    Array(8)
+      .fill(0)
+      .map((_, i) => `${t.player} ${i + 1}`),
+  );
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [editingAvatarIndex, setEditingAvatarIndex] = useState<number | null>(
@@ -80,6 +85,10 @@ export default function GameSettings({
     if (savedAvatars) {
       setAvatars(JSON.parse(savedAvatars));
     }
+    const savedNames = localStorage.getItem("hyper_ludo_player_names");
+    if (savedNames) {
+      setPlayerNames(JSON.parse(savedNames));
+    }
   }, []);
 
   const handleSave = () => {
@@ -90,6 +99,11 @@ export default function GameSettings({
     );
     // 保存头像设置
     localStorage.setItem("hyper_ludo_avatars", JSON.stringify(avatars));
+    // 保存玩家名称
+    localStorage.setItem(
+      "hyper_ludo_player_names",
+      JSON.stringify(playerNames),
+    );
     onSave();
   };
 
@@ -97,6 +111,12 @@ export default function GameSettings({
     const newAvatars = [...avatars];
     newAvatars[playerIndex] = avatar;
     setAvatars(newAvatars);
+  };
+
+  const updatePlayerName = (playerIndex: number, name: string) => {
+    const newNames = [...playerNames];
+    newNames[playerIndex] = name;
+    setPlayerNames(newNames);
   };
 
   const handleFileUpload = async (playerIndex: number, file: File) => {
@@ -107,7 +127,8 @@ export default function GameSettings({
       updateAvatar(playerIndex, url);
       setEditingAvatarIndex(null);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "上传失败";
+      const message =
+        error instanceof Error ? error.message : t.settings.uploadFailed;
       setUploadError(message);
     } finally {
       setUploading(false);
@@ -121,7 +142,8 @@ export default function GameSettings({
       const url = await uploadImageToLskyPro(file);
       setBgValue(url);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "上传失败";
+      const message =
+        error instanceof Error ? error.message : t.settings.uploadFailed;
       setUploadError(message);
     } finally {
       setUploading(false);
@@ -132,7 +154,7 @@ export default function GameSettings({
     <div className="fixed top-16 left-0 right-0 bottom-0 z-[100] bg-[#050510] flex flex-col animate-fade-in overflow-hidden">
       <div className="flex justify-between items-center p-6 border-b border-white/10 bg-black/60 flex-shrink-0">
         <h2 className="text-xl font-bold flex items-center gap-2">
-          <Palette className="text-cyan-400" /> 游戏设置
+          <Palette className="text-cyan-400" /> {t.settings.title}
         </h2>
         <div className="flex gap-2">
           <button
@@ -143,7 +165,7 @@ export default function GameSettings({
           <button
             onClick={handleSave}
             className="bg-cyan-600 hover:bg-cyan-500 px-6 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors">
-            <Save size={18} /> 保存
+            <Save size={18} /> {t.common.save}
           </button>
         </div>
       </div>
@@ -165,7 +187,7 @@ export default function GameSettings({
           <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
             <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
               <ImageIcon size={20} className="text-purple-400" />
-              背景设置
+              {t.settings.backgroundSettings}
             </h3>
 
             <div className="space-y-4">
@@ -177,7 +199,7 @@ export default function GameSettings({
                       ? "bg-purple-600 text-white"
                       : "bg-white/5 text-gray-400 hover:bg-white/10"
                   }`}>
-                  纯色背景
+                  {t.settings.backgroundColor}
                 </button>
                 <button
                   onClick={() => setBgType("image")}
@@ -186,13 +208,15 @@ export default function GameSettings({
                       ? "bg-purple-600 text-white"
                       : "bg-white/5 text-gray-400 hover:bg-white/10"
                   }`}>
-                  图片背景
+                  {t.settings.backgroundImage}
                 </button>
               </div>
 
               {bgType === "color" && (
                 <div className="space-y-3">
-                  <label className="text-sm text-gray-400">选择预设颜色</label>
+                  <label className="text-sm text-gray-400">
+                    {t.settings.selectColor}
+                  </label>
                   <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
                     {PRESET_COLORS.map((color) => (
                       <button
@@ -209,7 +233,7 @@ export default function GameSettings({
                   </div>
                   <div className="flex items-center gap-3">
                     <label className="text-sm text-gray-400">
-                      或输入颜色代码：
+                      {t.settings.colorCodeInput}
                     </label>
                     <input
                       type="text"
@@ -225,7 +249,7 @@ export default function GameSettings({
               {bgType === "image" && (
                 <div>
                   <label className="text-sm text-gray-400 block mb-2">
-                    图片 URL 或上传图片
+                    {t.settings.imageUrl}
                   </label>
                   <div className="space-y-3">
                     <div className="flex gap-2">
@@ -233,7 +257,7 @@ export default function GameSettings({
                         type="text"
                         value={bgValue}
                         onChange={(e) => setBgValue(e.target.value)}
-                        placeholder="https://example.com/image.jpg"
+                        placeholder={t.settings.imageUrlPlaceholder}
                         className="flex-1 bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-purple-500"
                       />
                       <button
@@ -247,7 +271,7 @@ export default function GameSettings({
                         ) : (
                           <Upload size={16} />
                         )}
-                        上传
+                        {t.settings.uploadBackground}
                       </button>
                       <input
                         id="bg-file-input"
@@ -274,7 +298,7 @@ export default function GameSettings({
           <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
             <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
               <User size={20} className="text-cyan-400" />
-              玩家头像
+              {t.settings.playerAvatars}
             </h3>
 
             <div className="space-y-4">
@@ -303,12 +327,21 @@ export default function GameSettings({
                       </div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold">玩家 {i + 1}</div>
+                      <div className="text-sm font-bold mb-1">
+                        {t.settings.playerName}
+                      </div>
+                      <input
+                        type="text"
+                        value={playerNames[i]}
+                        onChange={(e) => updatePlayerName(i, e.target.value)}
+                        placeholder={`${t.player} ${i + 1}`}
+                        className="w-full bg-black/40 border border-white/10 rounded px-3 py-1.5 text-xs outline-none focus:border-purple-500 mb-2"
+                      />
                       <input
                         type="text"
                         value={avatars[i]}
                         onChange={(e) => updateAvatar(i, e.target.value)}
-                        placeholder="输入 emoji 或图片 URL"
+                        placeholder={t.settings.imageUrlPlaceholder}
                         className="w-full bg-black/40 border border-white/10 rounded px-3 py-1 text-xs mt-1 outline-none focus:border-cyan-500"
                       />
                       <button
@@ -320,7 +353,7 @@ export default function GameSettings({
                         ) : (
                           <Upload size={12} />
                         )}
-                        上传头像
+                        {t.settings.uploadAvatar}
                       </button>
                       <input
                         ref={(el) => {

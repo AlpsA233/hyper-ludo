@@ -177,6 +177,18 @@ body {
   }
 }
 
+/* 卡牌效果emoji淡出动画 */
+@keyframes cardEffectFade {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.5) translateY(-20px);
+  }
+}
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

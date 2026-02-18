@@ -55,6 +55,7 @@ export interface Player {
   skipTurn: boolean;
   cards: Card[];
   avatar?: string; // 玩家头像（emoji或图片URL）
+  name?: string; // 玩家名称
 }
 
 // 背景设置

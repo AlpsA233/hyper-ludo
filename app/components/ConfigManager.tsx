@@ -10,12 +10,14 @@ import {
   AlertCircle,
 } from "lucide-react";
 import type { Card, GameEvent } from "@/app/types";
+import type { Translations } from "@/app/locales";
 
 interface ConfigManagerProps {
   cards: Card[];
   events: GameEvent[];
   onLoadCards: (cards: Card[]) => void;
   onLoadEvents: (events: GameEvent[]) => void;
+  t: Translations;
 }
 
 export default function ConfigManager({
@@ -23,6 +25,7 @@ export default function ConfigManager({
   events,
   onLoadCards,
   onLoadEvents,
+  t,
 }: ConfigManagerProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -46,19 +49,20 @@ export default function ConfigManager({
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "导出失败");
+        throw new Error(error.error || t.configManager.exportFailed);
       }
 
       const data = await response.json();
       setConfigId(data.id);
       setMessage({
         type: "success",
-        text: `配置导出成功: ${data.id}`,
+        text: `${t.configManager.exportSuccess}: ${data.id}`,
       });
     } catch (error) {
       setMessage({
         type: "error",
-        text: error instanceof Error ? error.message : "导出失败",
+        text:
+          error instanceof Error ? error.message : t.configManager.exportFailed,
       });
     } finally {
       setIsExporting(false);
@@ -69,7 +73,7 @@ export default function ConfigManager({
     if (!configId.trim()) {
       setMessage({
         type: "error",
-        text: "请输入配置ID",
+        text: t.configManager.enterConfigId,
       });
       return;
     }
@@ -83,7 +87,7 @@ export default function ConfigManager({
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "导入失败");
+        throw new Error(error.error || t.configManager.importFailed);
       }
 
       const config = await response.json();
@@ -92,13 +96,14 @@ export default function ConfigManager({
 
       setMessage({
         type: "success",
-        text: `配置导入成功（${config.id}）`,
+        text: `${t.configManager.importSuccess}（${config.id}）`,
       });
       setConfigId("");
     } catch (error) {
       setMessage({
         type: "error",
-        text: error instanceof Error ? error.message : "导入失败",
+        text:
+          error instanceof Error ? error.message : t.configManager.importFailed,
       });
     } finally {
       setIsImporting(false);
@@ -118,15 +123,18 @@ export default function ConfigManager({
           onLoadEvents(config.events);
           setMessage({
             type: "success",
-            text: "本地配置导入成功",
+            text: t.configManager.localImportSuccess,
           });
         } else {
-          throw new Error("配置格式无效");
+          throw new Error(t.configManager.invalidFormat);
         }
       } catch (error) {
         setMessage({
           type: "error",
-          text: error instanceof Error ? error.message : "导入失败",
+          text:
+            error instanceof Error
+              ? error.message
+              : t.configManager.importFailed,
         });
       }
     };
@@ -152,7 +160,7 @@ export default function ConfigManager({
 
     setMessage({
       type: "success",
-      text: "配置已下载到本地",
+      text: t.configManager.downloadSuccess,
     });
   };
 
@@ -185,12 +193,10 @@ export default function ConfigManager({
       <div className="bg-white/5 border border-white/10 rounded-lg p-4 space-y-3">
         <h3 className="font-bold text-sm flex items-center gap-2">
           <Download size={16} className="text-cyan-400" />
-          导出配置
+          {t.configManager.exportConfig}
         </h3>
         <div className="space-y-2 text-xs">
-          <p className="text-gray-400">
-            导出当前卡牌和事件配置到网络存储或本地文件
-          </p>
+          <p className="text-gray-400">{t.configManager.exportDescription}</p>
           <div className="flex gap-2">
             <button
               onClick={handleExport}
@@ -201,18 +207,18 @@ export default function ConfigManager({
               ) : (
                 <Download size={14} />
               )}
-              导出到网络
+              {t.configManager.exportToNetwork}
             </button>
             <button
               onClick={handleLocalExport}
               className="flex-1 px-3 py-2 rounded-lg bg-purple-600/50 hover:bg-purple-600 border border-purple-500 text-white font-bold flex items-center justify-center gap-2 transition-colors">
               <Download size={14} />
-              导出本地
+              {t.configManager.exportLocal}
             </button>
           </div>
           {configId && (
             <div className="bg-black/40 rounded p-3 space-y-2">
-              <p className="text-gray-300">配置ID (可分享给他人):</p>
+              <p className="text-gray-300">{t.configManager.shareableId}:</p>
               <div className="flex gap-2 items-center">
                 <input
                   type="text"
@@ -235,20 +241,22 @@ export default function ConfigManager({
       <div className="bg-white/5 border border-white/10 rounded-lg p-4 space-y-3">
         <h3 className="font-bold text-sm flex items-center gap-2">
           <Upload size={16} className="text-purple-400" />
-          导入配置
+          {t.configManager.importConfig}
         </h3>
         <div className="space-y-2 text-xs">
-          <p className="text-gray-400">从网络存储或本地文件导入配置</p>
+          <p className="text-gray-400">{t.configManager.importDescription}</p>
 
           {/* 网络导入 */}
           <div className="space-y-2">
-            <label className="text-gray-400">从配置ID导入</label>
+            <label className="text-gray-400">
+              {t.configManager.importFromId}
+            </label>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={configId}
                 onChange={(e) => setConfigId(e.target.value)}
-                placeholder="输入8位配置ID..."
+                placeholder={t.configManager.idPlaceholder}
                 className="flex-1 bg-black/40 border border-white/10 rounded px-3 py-2 text-xs text-white placeholder-gray-500 outline-none focus:border-purple-500"
               />
               <button
@@ -260,19 +268,21 @@ export default function ConfigManager({
                 ) : (
                   <Upload size={14} />
                 )}
-                导入
+                {t.configManager.import}
               </button>
             </div>
           </div>
 
           {/* 本地导入 */}
           <div className="space-y-2">
-            <label className="text-gray-400">从本地文件导入</label>
+            <label className="text-gray-400">
+              {t.configManager.importFromFile}
+            </label>
             <button
               onClick={() => fileInputRef.current?.click()}
               className="w-full px-3 py-2 rounded-lg bg-cyan-600/50 hover:bg-cyan-600 border border-cyan-500 text-white font-bold flex items-center justify-center gap-2 transition-colors">
               <Upload size={14} />
-              选择文件
+              {t.configManager.selectFile}
             </button>
             <input
               ref={fileInputRef}

@@ -27,6 +27,7 @@ import CardEditor from "@/app/components/CardEditor";
 import EventEditor from "@/app/components/EventEditor";
 import GameSettings from "@/app/components/GameSettings";
 import ConfigManager from "@/app/components/ConfigManager";
+import TargetSelector from "@/app/components/TargetSelector";
 import {
   COLORS,
   RARITY_CONFIG,
@@ -125,6 +126,10 @@ export default function App() {
   const [boardTiles, setBoardTiles] = useState<BoardTile[]>([]);
   const [activeEvent, setActiveEvent] = useState<GameEvent | null>(null);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  // 记录每个玩家头像上显示的卡牌效果emoji和消失时间
+  const [cardEffectDisplay, setCardEffectDisplay] = useState<
+    Record<number, { emoji: string; hideTime: number }>
+  >({});
 
   const diceRef = useRef<HTMLDivElement>(null);
   const piecesRef = useRef<(HTMLDivElement | null)[]>([]);
@@ -175,6 +180,28 @@ export default function App() {
     }
   }, [showLogs]);
 
+  // 清理过期的卡牌效果emoji
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const newCardEffectDisplay = { ...cardEffectDisplay };
+      let changed = false;
+
+      Object.keys(newCardEffectDisplay).forEach((key) => {
+        if (newCardEffectDisplay[parseInt(key)].hideTime <= now) {
+          delete newCardEffectDisplay[parseInt(key)];
+          changed = true;
+        }
+      });
+
+      if (changed) {
+        setCardEffectDisplay(newCardEffectDisplay);
+      }
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [cardEffectDisplay]);
+
   const totalSteps = useMemo(() => numPlayers * 10, [numPlayers]);
   const center = { x: 400, y: 400 };
 
@@ -199,6 +226,11 @@ export default function App() {
     );
     setBoardTiles(tiles);
 
+    // 读取保存的玩家名称
+    const savedNames = JSON.parse(
+      localStorage.getItem("hyper_ludo_player_names") || "[]",
+    );
+
     const initialPlayers: Player[] = Array.from({ length: numPlayers }).map(
       (_, i) => ({
         id: i,
@@ -209,6 +241,7 @@ export default function App() {
         shield: false,
         skipTurn: false,
         avatar: playerAvatars[i] || "👤", // 应用玩家头像设置
+        name: savedNames[i] || `${t.player} ${i + 1}`, // 应用玩家名称设置
         cards: Array.from({ length: initialCards }).map(() => {
           const baseCard =
             cardDatabase[Math.floor(Math.random() * cardDatabase.length)];
@@ -244,7 +277,12 @@ export default function App() {
       addLog("System: Energy depletion. Only 1 ability per cycle.");
       return;
     }
-    if (card.target === "PICK_ONE") {
+    // 对于所有需要目标的卡牌，都显示目标选择器
+    if (
+      card.target === "PICK_ONE" ||
+      card.target === "RANDOM_OTHER" ||
+      card.target === "ALL_OTHERS"
+    ) {
       setPickingTargetFor(card);
       setShowCardDrawer(false);
       return;
@@ -278,22 +316,43 @@ export default function App() {
     } else if (card.target === "PICK_ONE")
       targets = targetId !== null ? [targetId] : [];
 
+    // 用于显示emoji的延迟时间
+    const newCardEffectDisplay = { ...cardEffectDisplay };
+
     targets.forEach((tid) => {
       const t = newPlayers[tid];
+      let hideTime = Date.now() + 1000; // 默认1秒显示
+
       if (card.effect.move) {
         // 使用统一的位置计算函数
         const newPosition = calculateNewPosition(t, card.effect.move);
         t.pos = newPosition.pos;
         t.lap = newPosition.lap;
+        // 移动卡牌：走完后显示1秒（约750ms的动画+250ms延迟）
+        hideTime = Date.now() + 1750;
       }
-      if (card.effect.skip) t.skipTurn = true;
+      if (card.effect.skip) {
+        t.skipTurn = true;
+        // 暂停卡牌：需要等暂停结束后再消失
+        // 设置较长时间，实际消失会在skipTurn结束时处理
+        hideTime = Date.now() + 300000; // 5分钟，足以等待暂停结束
+      }
       if (card.effect.restart) {
         t.pos = -1;
         t.lap = 0;
+        // 重启卡牌：走完后显示1秒
+        hideTime = Date.now() + 1750;
       }
+
+      // 显示卡牌emoji
+      newCardEffectDisplay[tid] = {
+        emoji: card.pattern || "⚡",
+        hideTime,
+      };
     });
 
     setPlayers(newPlayers);
+    setCardEffectDisplay(newCardEffectDisplay);
     setPickingTargetFor(null);
     setShowCardDrawer(false);
     setHasUsedCard(true);
@@ -313,6 +372,12 @@ export default function App() {
       setPlayers((prev) =>
         prev.map((p, i) => (i === turn ? { ...p, skipTurn: false } : p)),
       );
+      // 清除暂停结束玩家的emoji，并在1秒后消失
+      const newCardEffectDisplay = { ...cardEffectDisplay };
+      if (newCardEffectDisplay[turn]) {
+        newCardEffectDisplay[turn].hideTime = Date.now() + 1000;
+        setCardEffectDisplay(newCardEffectDisplay);
+      }
       setTurn((turn + 1) % numPlayers);
       setHasUsedCard(false);
       return;
@@ -323,7 +388,7 @@ export default function App() {
       (window as any).gsap.to(diceRef.current, {
         rotationX: "random(720, 1080)",
         rotationY: "random(720, 1080)",
-        duration: 0.5,
+        duration: 1,
         ease: "power2.in",
         onComplete: () => {
           // 2. Determine value
@@ -360,7 +425,7 @@ export default function App() {
           (window as any).gsap.to(diceRef.current, {
             rotationX: nextX,
             rotationY: nextY,
-            duration: 0.5,
+            duration: 1,
             ease: "back.out(1.7)",
             onComplete: () => {
               setIsRolling(false);
@@ -645,6 +710,7 @@ export default function App() {
                       JSON.stringify(events),
                     );
                   }}
+                  t={t}
                 />
               </div>
             </div>
@@ -662,7 +728,7 @@ export default function App() {
         {phase === "playing" && (
           <div className="w-full h-full flex flex-col items-center justify-center px-4 relative">
             <div className="absolute top-16 left-0 right-0 z-40">
-              <div className="flex gap-3 overflow-x-auto no-scrollbar py-4 px-4 snap-x snap-mandatory">
+              <div className="flex gap-3 overflow-x-auto no-scrollbar py-8 px-4 snap-x snap-mandatory">
                 {players.map((p, i) => {
                   const isTurn = i === turn;
                   const progress =
@@ -824,7 +890,7 @@ export default function App() {
                   const isCustom = tile?.id === "CUSTOM";
                   const isStart = startPIdx >= 0;
 
-                  let fill = "rgba(255,255,255,0.1)";
+                  let fill = "rgba(255,255,255,0.25)";
                   let stroke = "none";
                   let radius = 3;
                   let filter = "";
@@ -881,7 +947,6 @@ export default function App() {
                   x = node.x;
                   y = node.y;
                 }
-                const isTargetable = pickingTargetFor && i !== turn;
                 return (
                   <div
                     key={i}
@@ -890,27 +955,30 @@ export default function App() {
                         piecesRef.current[i] = el;
                       }
                     }}
-                    onClick={() =>
-                      isTargetable && executeCardEffect(pickingTargetFor, i)
-                    }
-                    className={`absolute w-10 h-10 -ml-5 -mt-5 flex items-center justify-center transition-all duration-500 ease-out ${i === turn ? "z-50" : "z-30"} ${isTargetable ? "cursor-pointer scale-125 animate-pulse shadow-[0_0_20px_red]" : ""}`}
+                    className="absolute w-10 h-10 -ml-5 -mt-5 flex items-center justify-center transition-all duration-500 ease-out"
                     style={{
                       left: `${(x / 800) * 100}%`,
                       top: `${(y / 800) * 100}%`,
+                      zIndex: i === turn ? 50 + i : 30 + i,
                     }}>
-                    {isTargetable && (
-                      <Target
-                        className="absolute -top-6 text-red-500"
-                        size={20}
-                      />
-                    )}
                     <div
-                      className="w-full h-full rounded-full border-2 border-white flex items-center justify-center bg-black/50"
+                      className="w-full h-full rounded-full border-2 border-white flex items-center justify-center bg-black/50 relative"
                       style={{
                         borderColor: p.color.hex,
                         boxShadow:
                           i === turn ? `0 0 15px ${p.color.hex}` : "none",
                       }}>
+                      {/* 卡牌效果emoji */}
+                      {cardEffectDisplay[i] &&
+                        cardEffectDisplay[i].hideTime > Date.now() && (
+                          <div
+                            className="absolute text-sm font-bold"
+                            style={{
+                              animation: `cardEffectFade 1s ease-out forwards`,
+                            }}>
+                            {cardEffectDisplay[i].emoji}
+                          </div>
+                        )}
                       <div className="w-2 h-2 rounded-full bg-white" />
                     </div>
                   </div>
@@ -955,13 +1023,6 @@ export default function App() {
                         className="sm:size-[14px] text-purple-300"
                       />
                       {t.game.handCards}
-                    </button>
-                  )}
-                  {pickingTargetFor && (
-                    <button
-                      onClick={() => setPickingTargetFor(null)}
-                      className="px-4 py-2 bg-gray-700 rounded-full text-[10px] font-black hover:bg-gray-600 transition-colors">
-                      {t.game.cancelSelect}
                     </button>
                   )}
                 </div>
@@ -1252,6 +1313,39 @@ export default function App() {
               </button>
             </div>
           </div>
+        )}
+
+        {/* 目标选择器 */}
+        {pickingTargetFor && (
+          <TargetSelector
+            players={players}
+            currentPlayerId={turn}
+            targetType={
+              pickingTargetFor.target as
+                | "PICK_ONE"
+                | "RANDOM_OTHER"
+                | "ALL_OTHERS"
+            }
+            onSelect={(targetId) => {
+              // 对于手动选择，立即执行效果
+              if (pickingTargetFor.target === "PICK_ONE") {
+                executeCardEffect(pickingTargetFor, targetId);
+              }
+            }}
+            onComplete={() => {
+              // 对于随机和全选，在动画完成后执行效果
+              if (pickingTargetFor.target === "RANDOM_OTHER") {
+                const others = players.filter((p) => p.id !== turn);
+                const randomTarget =
+                  others[Math.floor(Math.random() * others.length)];
+                executeCardEffect(pickingTargetFor, randomTarget.id);
+              } else if (pickingTargetFor.target === "ALL_OTHERS") {
+                executeCardEffect(pickingTargetFor);
+              }
+              setPickingTargetFor(null);
+            }}
+            t={t}
+          />
         )}
       </main>
     </div>
