@@ -25,6 +25,7 @@ import {
 import GameSetup from "@/app/components/GameSetup";
 import CardEditor from "@/app/components/CardEditor";
 import EventEditor from "@/app/components/EventEditor";
+import GameSettings from "@/app/components/GameSettings";
 import ConfigManager from "@/app/components/ConfigManager";
 import {
   COLORS,
