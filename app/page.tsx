@@ -653,7 +653,7 @@ export default function App() {
           <div className="star-layer-6" />
           <div className="star-layer-7" />
           <div className="star-layer-8" />
-          <div className="nebula animate-pulse" />
+          <div className="nebula" />
         </>
       )}
 
