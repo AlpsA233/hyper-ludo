@@ -80,7 +80,8 @@ body {
   animation: gradientBG 15s ease infinite;
 }
 
-.stars {
+/* Star layers - each with unique timing for natural randomness */
+.star-layer-1 {
   position: fixed;
   top: 0;
   left: 0;
@@ -88,17 +89,222 @@ body {
   height: 100%;
   z-index: -1;
   background-image:
-    radial-gradient(1px 1px at 10% 10%, white, transparent),
-    radial-gradient(1px 1px at 20% 20%, white, transparent),
-    radial-gradient(2px 2px at 30% 30%, rgba(255, 255, 255, 0.5), transparent),
-    radial-gradient(1px 1px at 40% 40%, white, transparent),
-    radial-gradient(1px 1px at 50% 50%, white, transparent),
-    radial-gradient(2px 2px at 60% 60%, rgba(255, 255, 255, 0.5), transparent),
-    radial-gradient(1px 1px at 70% 70%, white, transparent),
-    radial-gradient(1px 1px at 80% 80%, white, transparent),
-    radial-gradient(2px 2px at 90% 90%, rgba(255, 255, 255, 0.5), transparent);
-  background-size: 550px 550px;
-  opacity: 0.6;
+    radial-gradient(1.5px 1.5px at 12% 8%, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(0.8px 0.8px at 35% 22%, rgba(200, 220, 255, 0.7), transparent),
+    radial-gradient(2px 2px at 68% 45%, white, transparent),
+    radial-gradient(1px 1px at 88% 72%, rgba(255, 255, 255, 0.8), transparent);
+  background-size: 480px 480px, 520px 520px, 600px 600px, 450px 450px;
+  animation: drift-1 180s linear infinite, twinkle-1 3.2s ease-in-out infinite alternate;
+  animation-delay: 0s, 0.5s;
+  opacity: 1;
+}
+
+.star-layer-2 {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  background-image:
+    radial-gradient(2.5px 2.5px at 22% 15%, rgba(220, 230, 255, 0.8), transparent),
+    radial-gradient(1px 1px at 48% 38%, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(1.2px 1.2px at 75% 62%, rgba(255, 255, 255, 0.7), transparent);
+  background-size: 550px 550px, 490px 490px, 580px 580px;
+  animation: drift-2 280s linear infinite, twinkle-2 4.8s ease-in-out infinite alternate;
+  animation-delay: 0s, 1.2s;
+  opacity: 1;
+}
+
+.star-layer-3 {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  background-image:
+    radial-gradient(0.5px 0.5px at 8% 32%, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1.8px 1.8px at 42% 58%, white, transparent),
+    radial-gradient(1px 1px at 78% 85%, rgba(180, 200, 255, 0.8), transparent),
+    radial-gradient(2.2px 2.2px at 92% 12%, rgba(255, 255, 255, 0.9), transparent);
+  background-size: 420px 420px, 560px 560px, 500px 500px, 640px 640px;
+  animation: drift-3 350s linear infinite, twinkle-3 2.5s ease-in-out infinite alternate;
+  animation-delay: 0s, 2.1s;
+  opacity: 1;
+}
+
+.star-layer-4 {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  background-image:
+    radial-gradient(1.3px 1.3px at 18% 48%, rgba(255, 255, 255, 0.85), transparent),
+    radial-gradient(2.8px 2.8px at 58% 25%, rgba(200, 215, 255, 0.7), transparent),
+    radial-gradient(0.7px 0.7px at 85% 68%, rgba(255, 255, 255, 0.9), transparent);
+  background-size: 510px 510px, 590px 590px, 460px 460px;
+  animation: drift-4 120s linear infinite, twinkle-4 5.5s ease-in-out infinite alternate;
+  animation-delay: 0s, 0.8s;
+  opacity: 1;
+}
+
+.star-layer-5 {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  background-image:
+    radial-gradient(1px 1px at 28% 18%, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1.6px 1.6px at 52% 52%, white, transparent),
+    radial-gradient(2.3px 2.3px at 72% 78%, rgba(220, 230, 255, 0.75), transparent),
+    radial-gradient(0.9px 0.9px at 95% 35%, rgba(255, 255, 255, 0.9), transparent);
+  background-size: 530px 530px, 610px 610px, 470px 470px, 550px 550px;
+  animation: drift-5 240s linear infinite, twinkle-5 3.8s ease-in-out infinite alternate;
+  animation-delay: 0s, 1.8s;
+  opacity: 1;
+}
+
+.star-layer-6 {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  background-image:
+    radial-gradient(2.6px 2.6px at 15% 65%, rgba(255, 255, 255, 0.85), transparent),
+    radial-gradient(1.1px 1.1px at 45% 42%, rgba(200, 210, 255, 0.8), transparent),
+    radial-gradient(0.6px 0.6px at 82% 88%, rgba(255, 255, 255, 0.7), transparent);
+  background-size: 620px 620px, 440px 440px, 570px 570px;
+  animation: drift-6 390s linear infinite, twinkle-6 6.2s ease-in-out infinite alternate;
+  animation-delay: 0s, 2.8s;
+  opacity: 1;
+}
+
+.star-layer-7 {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  background-image:
+    radial-gradient(1.4px 1.4px at 5% 55%, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(2.1px 2.1px at 38% 8%, white, transparent),
+    radial-gradient(1px 1px at 62% 75%, rgba(180, 200, 255, 0.8), transparent),
+    radial-gradient(0.8px 0.8px at 90% 28%, rgba(255, 255, 255, 0.85), transparent);
+  background-size: 490px 490px, 580px 580px, 520px 520px, 430px 430px;
+  animation: drift-7 160s linear infinite, twinkle-7 4.3s ease-in-out infinite alternate;
+  animation-delay: 0s, 1.5s;
+  opacity: 1;
+}
+
+.star-layer-8 {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  background-image:
+    radial-gradient(1.9px 1.9px at 25% 92%, rgba(220, 230, 255, 0.8), transparent),
+    radial-gradient(1.2px 1.2px at 55% 68%, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(2.4px 2.4px at 70% 15%, white, transparent);
+  background-size: 540px 540px, 480px 480px, 600px 600px;
+  animation: drift-8 310s linear infinite, twinkle-8 5.1s ease-in-out infinite alternate;
+  animation-delay: 0s, 0.3s;
+  opacity: 1;
+}
+
+/* Unique drift animations for each layer */
+@keyframes drift-1 {
+  0% { background-position: 0% 0%, 10% 10%, 20% 20%, 30% 30%; }
+  100% { background-position: 100% 80%, 110% 90%, 120% 100%, 130% 110%; }
+}
+
+@keyframes drift-2 {
+  0% { background-position: 5% 15%, 15% 25%, 25% 5%; }
+  100% { background-position: 95% 105%, 105% 115%, 115% 95%; }
+}
+
+@keyframes drift-3 {
+  0% { background-position: 10% 5%, 20% 30%, 30% 10%, 40% 20%; }
+  100% { background-position: 110% 95%, 120% 120%, 130% 100%, 140% 110%; }
+}
+
+@keyframes drift-4 {
+  0% { background-position: 0% 20%, 10% 0%, 20% 15%; }
+  100% { background-position: 140% 110%, 150% 90%, 160% 105%; }
+}
+
+@keyframes drift-5 {
+  0% { background-position: 5% 10%, 15% 20%, 25% 5%, 35% 15%; }
+  100% { background-position: 105% 100%, 115% 110%, 125% 95%, 135% 105%; }
+}
+
+@keyframes drift-6 {
+  0% { background-position: 10% 25%, 20% 10%, 30% 20%; }
+  100% { background-position: 90% 115%, 100% 100%, 110% 110%; }
+}
+
+@keyframes drift-7 {
+  0% { background-position: 0% 15%, 10% 25%, 20% 5%, 30% 10%; }
+  100% { background-position: 130% 105%, 140% 115%, 150% 95%, 160% 100%; }
+}
+
+@keyframes drift-8 {
+  0% { background-position: 5% 20%, 15% 5%, 25% 10%; }
+  100% { background-position: 115% 110%, 125% 95%, 135% 100%; }
+}
+
+/* Unique twinkle animations with different patterns */
+@keyframes twinkle-1 {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.9; }
+}
+
+@keyframes twinkle-2 {
+  0%, 100% { opacity: 0.4; }
+  30% { opacity: 0.7; }
+  70% { opacity: 0.85; }
+}
+
+@keyframes twinkle-3 {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.8; }
+}
+
+@keyframes twinkle-4 {
+  0%, 100% { opacity: 0.35; }
+  40% { opacity: 0.75; }
+  80% { opacity: 0.5; }
+}
+
+@keyframes twinkle-5 {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 0.95; }
+}
+
+@keyframes twinkle-6 {
+  0%, 100% { opacity: 0.3; }
+  25% { opacity: 0.6; }
+  75% { opacity: 0.85; }
+}
+
+@keyframes twinkle-7 {
+  0%, 100% { opacity: 0.4; }
+  60% { opacity: 0.9; }
+}
+
+@keyframes twinkle-8 {
+  0%, 100% { opacity: 0.35; }
+  20% { opacity: 0.55; }
+  80% { opacity: 0.8; }
 }
 
 @keyframes gradientBG {

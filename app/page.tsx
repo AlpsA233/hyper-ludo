@@ -645,7 +645,14 @@ export default function App() {
       {backgroundSettings.type === "color" && (
         <>
           <div className="space-background" />
-          <div className="stars" />
+          <div className="star-layer-1" />
+          <div className="star-layer-2" />
+          <div className="star-layer-3" />
+          <div className="star-layer-4" />
+          <div className="star-layer-5" />
+          <div className="star-layer-6" />
+          <div className="star-layer-7" />
+          <div className="star-layer-8" />
           <div className="nebula animate-pulse" />
         </>
       )}
