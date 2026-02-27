@@ -38,6 +38,7 @@ export default function EventEditor({
     val: 0,
     color: EVENT_COLORS[0].value,
     progressRange: { min: 0, max: 100 },
+    limitPerPlayer: undefined,
   });
 
   const save = () => {
@@ -54,6 +55,7 @@ export default function EventEditor({
         val: 0,
         color: EVENT_COLORS[0].value,
         progressRange: { min: 0, max: 100 },
+        limitPerPlayer: undefined,
       });
     }
   };
@@ -196,6 +198,36 @@ export default function EventEditor({
               </p>
             </div>
 
+            {/* Appearance Limit Per Player */}
+            <div>
+              <label className="text-[10px] text-gray-500 block mb-2">
+                每个角色最多出现次数
+              </label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  min="0"
+                  value={newItem.limitPerPlayer || ""}
+                  onChange={(e) => {
+                    const val = e.target.value
+                      ? parseInt(e.target.value)
+                      : undefined;
+                    setNewItem({ ...newItem, limitPerPlayer: val });
+                  }}
+                  placeholder="不限制"
+                  className="flex-1 bg-black/40 border border-white/10 rounded p-2 text-xs outline-none focus:border-purple-500 transition-colors"
+                />
+                <span className="text-[9px] text-gray-600 whitespace-nowrap">
+                  {newItem.limitPerPlayer
+                    ? `最多 ${newItem.limitPerPlayer} 次`
+                    : "无限制"}
+                </span>
+              </div>
+              <p className="text-[9px] text-gray-600 mt-2">
+                设置为 0 表示该事件不会出现，留空表示无限制
+              </p>
+            </div>
+
             {/* Target Selection */}
             <div>
               <label className="text-[10px] text-gray-500 block mb-1">
@@ -319,6 +351,14 @@ export default function EventEditor({
                           <span className="text-green-400">
                             进度 {item.progressRange.min}-
                             {item.progressRange.max}%
+                          </span>
+                        </>
+                      )}
+                      {item.limitPerPlayer !== undefined && (
+                        <>
+                          <span className="text-gray-600">·</span>
+                          <span className="text-yellow-400">
+                            每角 {item.limitPerPlayer} 次
                           </span>
                         </>
                       )}

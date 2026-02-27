@@ -13,7 +13,7 @@ interface GameBoardProps {
   trackWidth: number;
   innerRadius: number;
   innerRadius2: number;
-  triggerEventEveryStep: boolean;
+  eventDensity: number;
   center: { x: number; y: number };
   isPC: boolean;
 }
@@ -29,7 +29,7 @@ export default function GameBoard({
   trackWidth,
   innerRadius,
   innerRadius2,
-  triggerEventEveryStep,
+  eventDensity,
   isPC,
 }: GameBoardProps) {
   return (
@@ -115,7 +115,7 @@ export default function GameBoard({
               : -1;
           const isCustom = tile?.id === "CUSTOM";
           const isStart = startPIdx >= 0;
-          const shouldShowAsEvent = triggerEventEveryStep && !isStart;
+          const shouldShowAsEvent = eventDensity === 100 && !isStart;
 
           let fill = "rgba(255,255,255,0.25)";
           let radius = 3;

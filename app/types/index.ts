@@ -6,6 +6,7 @@ export type GamePhase =
   | "config_cards"
   | "config_events"
   | "config_manager"
+  | "library_manager"
   | "event"
   | "win";
 
@@ -49,6 +50,7 @@ export interface GameEvent {
   val: number;
   color?: string; // 事件颜色标识
   progressRange?: ProgressRange; // 允许出现的游戏进度范围（百分比）
+  limitPerPlayer?: number; // 每个玩家最多出现次数
 }
 
 // 玩家

@@ -13,16 +13,14 @@ import type { Translations } from "@/app/locales";
 interface GameSetupProps {
   numPlayers: number;
   lapsToWin: number;
-  cardCount: number;
-  eventCount: number;
-  triggerEventEveryStep: boolean;
+  eventDensity: number;
   onNumPlayersChange: (num: number) => void;
   onLapsToWinChange: (laps: number) => void;
+  onEventDensityChange: (density: number) => void;
   onEditCards: () => void;
   onEditEvents: () => void;
   onOpenSettings: () => void;
   onManageConfig: () => void;
-  onToggleTriggerEventEveryStep: () => void;
   onStartGame: () => void;
   t: Translations;
 }
@@ -30,16 +28,14 @@ interface GameSetupProps {
 export default function GameSetup({
   numPlayers,
   lapsToWin,
-  cardCount,
-  eventCount,
-  triggerEventEveryStep,
+  eventDensity,
   onNumPlayersChange,
   onLapsToWinChange,
+  onEventDensityChange,
   onEditCards,
   onEditEvents,
   onOpenSettings,
   onManageConfig,
-  onToggleTriggerEventEveryStep,
   onStartGame,
   t,
 }: GameSetupProps) {
@@ -81,53 +77,43 @@ export default function GameSetup({
           </div>
         </div>
 
-        {/* 每步触发事件模式 */}
-        <div className="bg-white/5 border border-white/10 rounded-lg p-3 flex items-center justify-between">
-          <div className="flex-1">
-            <label className="text-xs font-bold text-white block mb-1">
-              {t.setup.stepByStepAlert}
+        {/* 事件密度设置 */}
+        <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+          <div className="flex justify-between items-center mb-3">
+            <label className="text-xs font-bold text-white">
+              {t.setup.eventDensity}
             </label>
-            <span className="text-[9px] text-gray-500">
-              {triggerEventEveryStep
-                ? t.setup.stepByStepAlertDesc
-                : `禁用：仅在特殊格子触发事件`}
+            <span className="text-sm font-bold text-cyan-400">
+              {eventDensity}%
             </span>
           </div>
-          <button
-            onClick={onToggleTriggerEventEveryStep}
-            className={`ml-3 w-12 h-6 rounded-full transition-all ${
-              triggerEventEveryStep
-                ? "bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]"
-                : "bg-white/10"
-            }`}>
-            <div
-              className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                triggerEventEveryStep ? "translate-x-6" : "translate-x-0.5"
-              }`}
-            />
-          </button>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={eventDensity}
+            onChange={(e) => onEventDensityChange(+e.target.value)}
+            className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+          />
+          <p className="text-[9px] text-gray-500 mt-2">
+            {eventDensity === 0
+              ? "仅在部分格子触发事件"
+              : eventDensity === 100
+                ? t.setup.eventDensityHigh
+                : `${eventDensity}% 概率在每步触发事件`}
+          </p>
         </div>
 
         <div className="flex flex-col gap-2 pt-2">
           <button
             onClick={onOpenSettings}
-            className="w-full py-3 bg-gradient-to-r from-pink-500/10 to-purple-500/10 border border-pink-500/20 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:from-pink-500/20 hover:to-purple-500/20 transition-all shadow-lg active:scale-95">
+            className="w-full py-2 bg-gradient-to-r from-pink-500/10 to-purple-500/10 border border-pink-500/20 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:from-pink-500/20 hover:to-purple-500/20 transition-all shadow-lg active:scale-95">
             <Settings size={14} /> {t.setup.gameSettings}
           </button>
           <button
             onClick={onManageConfig}
-            className="w-full py-3 bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:from-orange-500/20 hover:to-red-500/20 transition-all shadow-lg active:scale-95">
-            <Upload size={14} /> {t.setup.configManager}
-          </button>
-          <button
-            onClick={onEditCards}
-            className="w-full py-3 bg-cyan-500/10 border border-cyan-500/20 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:bg-cyan-500/20 transition-all shadow-lg active:scale-95">
-            <CreditCard size={14} /> {t.setup.cardLibrary} ({cardCount})
-          </button>
-          <button
-            onClick={onEditEvents}
-            className="w-full py-3 bg-purple-500/10 border border-purple-500/20 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:bg-purple-500/20 transition-all shadow-lg active:scale-95">
-            <MessageSquare size={14} /> {t.setup.eventLibrary} ({eventCount})
+            className="w-full py-2 bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:from-orange-500/20 hover:to-red-500/20 transition-all shadow-lg active:scale-95">
+            <Upload size={14} /> {t.setup.manageLibraries}
           </button>
         </div>
         <button

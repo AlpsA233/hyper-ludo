@@ -16,12 +16,10 @@ export interface Translations {
     title: string;
     numPlayers: string;
     lapsToWin: string;
-    cardLibrary: string;
-    eventLibrary: string;
-    gameSettings: string;
-    configManager: string;
-    stepByStepAlert: string;
-    stepByStepAlertDesc: string;
+    eventDensity: string;
+    eventDensityLow: string;
+    eventDensityHigh: string;
+    manageLibraries: string;
     startGame: string;
   };
 
@@ -154,12 +152,10 @@ const zh: Translations = {
     title: "星际派对配置",
     numPlayers: "玩家人数",
     lapsToWin: "胜利圈数",
-    cardLibrary: "战术卡库",
-    eventLibrary: "冒险事件",
-    gameSettings: "游戏设置",
-    configManager: "配置导入导出",
-    stepByStepAlert: "步步惊心",
-    stepByStepAlertDesc: "每一步都可能触发事件",
+    eventDensity: "事件密度",
+    eventDensityLow: "低密度：事件较稀少",
+    eventDensityHigh: "高密度：步步惊心",
+    manageLibraries: "库管理",
     startGame: "启动任务",
   },
   settings: {
@@ -280,12 +276,10 @@ const en: Translations = {
     title: "Space Party Config",
     numPlayers: "Number of Players",
     lapsToWin: "Laps to Win",
-    cardLibrary: "Tactical Card Library",
-    eventLibrary: "Adventure Events",
-    gameSettings: "Game Settings",
-    configManager: "Config Import/Export",
-    stepByStepAlert: "Step by Step Alert",
-    stepByStepAlertDesc: "Event can trigger every step",
+    eventDensity: "Event Density",
+    eventDensityLow: "Low Density: Rare Events",
+    eventDensityHigh: "High Density: Event Every Step",
+    manageLibraries: "Manage Libraries",
     startGame: "Start Game",
   },
   settings: {
@@ -407,12 +401,10 @@ const ja: Translations = {
     title: "スペースパーティ設定",
     numPlayers: "プレイヤー数",
     lapsToWin: "勝利ラップ",
-    cardLibrary: "タクティカルカードライブラリ",
-    eventLibrary: "アドベンチャーイベント",
-    gameSettings: "ゲーム設定",
-    configManager: "設定のインポート/エクスポート",
-    stepByStepAlert: "ステップバイステップアラート",
-    stepByStepAlertDesc: "各ステップでイベントがトリガーされる可能性があります",
+    eventDensity: "イベント密度",
+    eventDensityLow: "低密度：イベントが少ない",
+    eventDensityHigh: "高密度：毎ステップイベント",
+    manageLibraries: "ライブラリ管理",
     startGame: "ゲーム開始",
   },
   settings: {
@@ -535,13 +527,10 @@ const fr: Translations = {
     title: "Configuration du Party Spatial",
     numPlayers: "Nombre de joueurs",
     lapsToWin: "Tours pour gagner",
-    cardLibrary: "Bibliothèque de cartes tactiques",
-    eventLibrary: "Événements d'aventure",
-    gameSettings: "Paramètres du jeu",
-    configManager: "Import/Export de configuration",
-    stepByStepAlert: "Alerte Étape par Étape",
-    stepByStepAlertDesc:
-      "Les événements peuvent être déclenchés à chaque étape",
+    eventDensity: "Densité d'événements",
+    eventDensityLow: "Faible densité : événements rares",
+    eventDensityHigh: "Haute densité : événement chaque étape",
+    manageLibraries: "Gérer les bibliothèques",
     startGame: "Commencer le jeu",
   },
   settings: {

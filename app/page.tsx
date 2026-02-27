@@ -108,7 +108,7 @@ export default function App() {
   const [numPlayers, setNumPlayers] = useState(4);
   const [lapsToWin, setLapsToWin] = useState(3);
   const [initialCards, setInitialCards] = useState(5);
-  const [triggerEventEveryStep, setTriggerEventEveryStep] = useState(false);
+  const [eventDensity, setEventDensity] = useState(40); // 事件密度：0-100（百分比）
   const [players, setPlayers] = useState<Player[]>([]);
   const [turn, setTurn] = useState(0);
   const [diceValue, setDiceValue] = useState(1);
@@ -139,6 +139,10 @@ export default function App() {
   const [boardTiles, setBoardTiles] = useState<BoardTile[]>([]);
   const [activeEvent, setActiveEvent] = useState<GameEvent | null>(null);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  // 记录每个玩家触发过的事件及次数: Record<playerIndex, Record<eventId, count>>
+  const [eventCounts, setEventCounts] = useState<
+    Record<number, Record<number, number>>
+  >({});
   // 记录每个玩家头像上显示的卡牌效果emoji和消失时间
   const [cardEffectDisplay, setCardEffectDisplay] = useState<
     Record<number, { emoji: string; hideTime: number }>
@@ -249,6 +253,9 @@ export default function App() {
   // --- 游戏逻辑 ---
   const startGame = () => {
     if (eventDatabase.length === 0) return alert(t.game.noEventsAlert);
+
+    // 重置事件计数
+    setEventCounts({});
 
     const tiles: BoardTile[] = Array.from({ length: totalSteps }).map((_, i) =>
       i % (totalSteps / numPlayers) < 2
@@ -503,19 +510,21 @@ export default function App() {
         return next;
       });
       addLog(`Player ${turn + 1} moved to pos ${finalPos} (lap ${newLap})`);
-      // 触发事件：CUSTOM格子 或 触发每步事件模式
-      const shouldTriggerEvent =
-        (finalPos !== -1 && boardTiles[finalPos]?.id === "CUSTOM") ||
-        (triggerEventEveryStep && finalPos !== -1);
+      // 事件触发: CUSTOM格子 或 根据事件密度在任意位置触发
+      const isCustomTile =
+        finalPos !== -1 && boardTiles[finalPos]?.id === "CUSTOM";
+      const willTriggerByDensity =
+        finalPos !== -1 && Math.random() * 100 < eventDensity;
+      const willTriggerEvent = isCustomTile || willTriggerByDensity;
 
-      if (shouldTriggerEvent) {
+      if (willTriggerEvent) {
         setTimeout(() => {
           // 计算当前游戏进度百分比 (0-100)
           const totalLaps = lapsToWin;
           const currentProgress = (newLap / totalLaps) * 100;
 
           // 筛选当前进度允许的事件
-          const allowedEvents = eventDatabase.filter((evt) => {
+          let allowedEvents = eventDatabase.filter((evt) => {
             // 如果progressRange未定义，表示全程都允许
             if (!evt.progressRange) return true;
             // 否则检查当前进度是否在范围内
@@ -524,6 +533,17 @@ export default function App() {
               currentProgress <= evt.progressRange.max
             );
           });
+
+          // 进一步过滤：检查 limitPerPlayer 限制
+          allowedEvents = allowedEvents.filter((evt) => {
+            // 如果没有设置限制，或限制为 undefined，则允许
+            if (evt.limitPerPlayer === undefined) return true;
+            // 获取当前玩家已触发该事件的次数
+            const playerEventCount = eventCounts[turn]?.[evt.id] || 0;
+            // 如果还未达到限制，允许
+            return playerEventCount < evt.limitPerPlayer;
+          });
+
           // 如果没有允许的事件，跳过事件触发
           if (allowedEvents.length === 0) {
             setIsMoving(false);
@@ -534,6 +554,17 @@ export default function App() {
           const event =
             allowedEvents[Math.floor(Math.random() * allowedEvents.length)];
           addLog(`Player ${turn + 1} triggered: ${event.text}`);
+
+          // 更新该事件的触发次数
+          setEventCounts((prev) => {
+            const newCounts = { ...prev };
+            if (!newCounts[turn]) {
+              newCounts[turn] = {};
+            }
+            newCounts[turn][event.id] = (newCounts[turn][event.id] || 0) + 1;
+            return newCounts;
+          });
+
           setActiveEvent({
             id: event.id,
             text: event.text,
@@ -592,8 +623,8 @@ export default function App() {
     let totalDistance;
 
     if (player.pos === -1) {
-      // 如果还没进入棋盘，从起点开始
-      totalDistance = steps > 1 ? steps - 1 : 0;
+      // 如果还没进入棋盘，直接走指定步数
+      totalDistance = steps;
     } else {
       // 玩家当前已经走过的距离
       const currentDistance =
@@ -709,21 +740,48 @@ export default function App() {
           <GameSetup
             numPlayers={numPlayers}
             lapsToWin={lapsToWin}
-            cardCount={cardDatabase.length}
-            eventCount={eventDatabase.length}
+            eventDensity={eventDensity}
             onNumPlayersChange={setNumPlayers}
             onLapsToWinChange={setLapsToWin}
+            onEventDensityChange={setEventDensity}
             onEditCards={() => setPhase("config_cards")}
             onEditEvents={() => setPhase("config_events")}
             onOpenSettings={() => setPhase("settings")}
-            onManageConfig={() => setPhase("config_manager")}
+            onManageConfig={() => setPhase("library_manager")}
             onStartGame={startGame}
-            triggerEventEveryStep={triggerEventEveryStep}
-            onToggleTriggerEventEveryStep={() =>
-              setTriggerEventEveryStep(!triggerEventEveryStep)
-            }
             t={t}
           />
+        )}
+
+        {/* 库管理菜单 */}
+        {phase === "library_manager" && (
+          <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-black/80 border border-white/10 rounded-3xl p-8 max-w-sm w-full space-y-4 animate-fade-in">
+              <h3 className="text-xl font-bold text-white mb-6 text-center">
+                库管理
+              </h3>
+              <button
+                onClick={() => setPhase("config_cards")}
+                className="w-full py-3 px-4 bg-cyan-500/10 border border-cyan-500/20 rounded-xl text-sm font-bold hover:bg-cyan-500/20 transition-all">
+                📚 编辑卡牌库
+              </button>
+              <button
+                onClick={() => setPhase("config_events")}
+                className="w-full py-3 px-4 bg-purple-500/10 border border-purple-500/20 rounded-xl text-sm font-bold hover:bg-purple-500/20 transition-all">
+                ⚡ 编辑事件库
+              </button>
+              <button
+                onClick={() => setPhase("config_manager")}
+                className="w-full py-3 px-4 bg-orange-500/10 border border-orange-500/20 rounded-xl text-sm font-bold hover:bg-orange-500/20 transition-all">
+                ⚙️ 配置导入导出
+              </button>
+              <button
+                onClick={() => setPhase("setup")}
+                className="w-full py-3 px-4 bg-white/5 border border-white/10 rounded-xl text-sm font-bold hover:bg-white/10 transition-all mt-4">
+                返回
+              </button>
+            </div>
+          </div>
         )}
 
         {phase === "config_cards" && (
@@ -835,7 +893,7 @@ export default function App() {
                 trackWidth={trackWidth}
                 innerRadius={innerRadius}
                 innerRadius2={innerRadius2}
-                triggerEventEveryStep={triggerEventEveryStep}
+                eventDensity={eventDensity}
                 center={center}
                 isPC={isPC}
               />
@@ -1036,7 +1094,10 @@ export default function App() {
         <WinScreen
           winner={winner}
           winnerIndex={players.findIndex((p) => p === winner)}
-          setPhase={setPhase}
+          setPhase={(phase) => {
+            setEventCounts({});
+            setPhase(phase);
+          }}
           t={t.game}
         />
 
