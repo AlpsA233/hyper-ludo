@@ -28,6 +28,15 @@ import EventEditor from "@/app/components/EventEditor";
 import GameSettings from "@/app/components/GameSettings";
 import ConfigManager from "@/app/components/ConfigManager";
 import TargetSelector from "@/app/components/TargetSelector";
+import GameBoard from "@/app/components/GameBoard";
+import GamePieces from "@/app/components/GamePieces";
+import DiceControl from "@/app/components/DiceControl";
+import PlayerSidebar from "@/app/components/PlayerSidebar";
+import GameInfoSidebar from "@/app/components/GameInfoSidebar";
+import CardDrawer from "@/app/components/CardDrawer";
+import GameLog from "@/app/components/GameLog";
+import EventModal from "@/app/components/EventModal";
+import WinScreen from "@/app/components/WinScreen";
 import {
   COLORS,
   RARITY_CONFIG,
@@ -145,8 +154,8 @@ export default function App() {
       setIsPC(window.innerWidth >= 1024);
     };
     checkIsPC();
-    window.addEventListener('resize', checkIsPC);
-    return () => window.removeEventListener('resize', checkIsPC);
+    window.addEventListener("resize", checkIsPC);
+    return () => window.removeEventListener("resize", checkIsPC);
   }, []);
 
   // 初始化加载
@@ -230,7 +239,9 @@ export default function App() {
   const trackCoords = useMemo(() => {
     const coords = [];
     for (let i = 0; i < totalSteps; i++) {
-      coords.push(getPolygonalPos(i, totalSteps, trackRadius, center.x, center.y));
+      coords.push(
+        getPolygonalPos(i, totalSteps, trackRadius, center.x, center.y),
+      );
     }
     return coords;
   }, [totalSteps, trackRadius]);
@@ -778,605 +789,216 @@ export default function App() {
         )}
 
         {phase === "playing" && (
-          <div className={`w-full h-full flex ${isPC ? 'flex-row' : 'flex-col'} items-center justify-center ${isPC ? 'gap-16 px-8' : 'px-4'} relative`}>
-            {/* 左侧边栏 - 玩家信息 (PC端) / 顶部 (移动端) */}
-            <div className={`${isPC ? 'w-64 h-full flex flex-col gap-4 pt-28 pb-8' : 'absolute top-16 left-0 right-0'} z-40`}>
-              <div className={`flex ${isPC ? 'flex-col' : 'flex-row overflow-x-auto no-scrollbar snap-x snap-mandatory'} gap-3 ${isPC ? '' : 'py-8 px-4'}`}>
-                {(isPC 
-                  ? [...players].sort((a, b) => {
-                      const startIndexA = players.indexOf(a) * (totalSteps / numPlayers);
-                      const startIndexB = players.indexOf(b) * (totalSteps / numPlayers);
-                      const relPosA = a.pos !== -1 ? (a.pos - startIndexA + totalSteps) % totalSteps : 0;
-                      const relPosB = b.pos !== -1 ? (b.pos - startIndexB + totalSteps) % totalSteps : 0;
-                      const progressA = a.lap * totalSteps + relPosA;
-                      const progressB = b.lap * totalSteps + relPosB;
-                      return progressB - progressA;
-                    })
-                  : players
-                ).map((p) => {
-                  const i = players.indexOf(p);
-                  const isTurn = i === turn;
-                  // 计算总进度（相对于起始点）
-                  const startIndex = i * (totalSteps / numPlayers);
-                  let relativePos = 0;
-                  if (p.pos !== -1) {
-                    relativePos = (p.pos - startIndex + totalSteps) % totalSteps;
-                  }
-                  const totalProgress = p.lap * totalSteps + relativePos;
-                  const maxProgress = lapsToWin * totalSteps;
-                  const progress = maxProgress > 0 ? (totalProgress / maxProgress) * 100 : 0;
-                  
-                  // 计算排名
-                  const sortedPlayers = [...players].sort((a, b) => {
-                    const indexA = players.indexOf(a);
-                    const indexB = players.indexOf(b);
-                    const startA = indexA * (totalSteps / numPlayers);
-                    const startB = indexB * (totalSteps / numPlayers);
-                    let relPosA = 0, relPosB = 0;
-                    if (a.pos !== -1) relPosA = (a.pos - startA + totalSteps) % totalSteps;
-                    if (b.pos !== -1) relPosB = (b.pos - startB + totalSteps) % totalSteps;
-                    const progressA = a.lap * totalSteps + relPosA;
-                    const progressB = b.lap * totalSteps + relPosB;
-                    return progressB - progressA;
-                  });
-                  const rank = sortedPlayers.indexOf(p) + 1;
-
-                  return (
-                    <div
-                      key={i}
-                      className={`relative p-3 rounded-2xl border transition-all duration-500 flex ${isPC ? 'flex-row' : 'flex-col'} items-center ${isPC ? 'w-full' : 'min-w-[110px] max-w-[110px]'} shrink-0 backdrop-blur-xl ${isPC ? '' : 'snap-center'}
-                      ${
-                        isTurn
-                          ? "bg-white/10 border-white/30 scale-105 shadow-[0_0_20px_rgba(255,255,255,0.1)] z-10"
-                          : "bg-black/40 border-white/5 opacity-60 hover:opacity-100"
-                      }`}
-                      style={{
-                        borderColor: isTurn
-                          ? p.color.hex
-                          : "rgba(255,255,255,0.1)",
-                        boxShadow: isTurn
-                          ? `0 0 15px ${p.color.hex}40`
-                          : "none",
-                      }}>
-                      {isTurn && (
-                        <div className={`absolute ${isPC ? '-left-3 top-1/2 -translate-y-1/2' : '-top-6 left-1/2 -translate-x-1/2'}`}>
-                          <div className="animate-bounce">
-                            <div
-                              className={`w-0 h-0 ${isPC ? 'border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-l-[8px]' : 'border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px]'}`}
-                              style={isPC ? { borderLeftColor: p.color.hex } : { borderTopColor: p.color.hex }}></div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 排名徽章 */}
-                      <div className="absolute -right-2 -top-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-lg z-10"
-                           style={{ 
-                             backgroundColor: rank === 1 ? '#FFD700' : rank === 2 ? '#C0C0C0' : rank === 3 ? '#CD7F32' : '#4a5568',
-                             color: rank <= 3 ? '#000' : '#fff',
-                             border: '2px solid rgba(255,255,255,0.3)'
-                           }}>
-                        {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank}
-                      </div>
-
-                      <div className={`flex items-center gap-3 ${isPC ? '' : 'mb-2'} w-full`}>
-                        <div
-                          className="w-10 h-10 rounded-full shadow-lg relative overflow-hidden flex items-center justify-center shrink-0 border-2 text-xl"
-                          style={{
-                            borderColor: p.color.hex,
-                            backgroundColor: `${p.color.hex}20`,
-                          }}>
-                          {p.avatar && p.avatar.startsWith("http") ? (
-                            <img
-                              src={p.avatar}
-                              alt={`Player ${i + 1}`}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <span>{p.avatar || "👤"}</span>
-                          )}
-                        </div>
-
-                        <div className="flex flex-col min-w-0 flex-1 items-start">
-                          <div className="text-xs font-bold text-gray-200 truncate leading-none mb-1">
-                            {t.player} {i + 1}
-                          </div>
-                          <div className="text-[10px] text-gray-400 font-mono leading-none">
-                            {p.lap}/{lapsToWin} {t.circle} · {Math.round(progress)}%
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Progress Bar */}
-                      <div className={`${isPC ? 'w-full' : 'w-full'} h-1 bg-white/10 rounded-full overflow-hidden ${isPC ? 'mt-2' : ''}`}>
-                        <div
-                          className="h-full rounded-full transition-all duration-1000 ease-out relative"
-                          style={{
-                            width: `${Math.min(progress, 100)}%`,
-                            background: p.color.hex,
-                          }}></div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-            </div>
-
-            {/* 中间 - 棋盘 */}
-            <div className={`relative ${isPC ? 'flex-1 max-w-[min(70vh,750px)]' : 'w-full max-w-[min(95vw,450px)] md:max-w-[min(85vw,650px)]'} aspect-square`}>
-              <svg
-                viewBox="0 0 800 800"
-                className="w-full h-full drop-shadow-2xl overflow-visible filter drop-shadow-[0_0_30px_rgba(5,217,232,0.1)]">
-                <defs>
-                  <filter
-                    id="glow"
-                    x="-50%"
-                    y="-50%"
-                    width="200%"
-                    height="200%">
-                    <feGaussianBlur stdDeviation="4" result="coloredBlur" />
-                    <feMerge>
-                      <feMergeNode in="coloredBlur" />
-                      <feMergeNode in="SourceGraphic" />
-                    </feMerge>
-                  </filter>
-                  <linearGradient
-                    id="trackGradient"
-                    x1="0%"
-                    y1="0%"
-                    x2="100%"
-                    y2="100%">
-                    <stop offset="0%" stopColor="rgba(5, 217, 232, 0.05)" />
-                    <stop offset="100%" stopColor="rgba(211, 85, 255, 0.05)" />
-                  </linearGradient>
-                </defs>
-
-                {/* Decorative Rings */}
-                <circle
-                  cx="400"
-                  cy="400"
-                  r={decorativeRadius1}
-                  fill="none"
-                  stroke="rgba(255,255,255,0.02)"
-                  strokeWidth="1"
-                  strokeDasharray="10 20"
-                  className="animate-[spin_60s_linear_infinite]"
+          <div
+            className={`w-full h-full flex ${isPC ? "flex-row" : "flex-col"} ${isPC ? "items-start justify-center" : "items-center justify-center"} ${isPC ? "gap-16 px-8 pt-20" : "px-4"} relative`}>
+            {/* Player Sidebar */}
+            {isPC ? (
+              <PlayerSidebar
+                players={players}
+                turn={turn}
+                lapsToWin={lapsToWin}
+                totalSteps={totalSteps}
+                isPC={isPC}
+                t={t.game}
+              />
+            ) : (
+              <div className="absolute top-16 left-0 right-0 z-40">
+                <PlayerSidebar
+                  players={players}
+                  turn={turn}
+                  lapsToWin={lapsToWin}
+                  totalSteps={totalSteps}
+                  isPC={isPC}
+                  t={t.game}
                 />
-                <circle
-                  cx="400"
-                  cy="400"
-                  r={decorativeRadius2}
-                  fill="none"
-                  stroke="rgba(255,255,255,0.01)"
-                  strokeWidth="1"
-                  strokeDasharray="5 15"
-                  className="animate-[spin_80s_linear_infinite_reverse]"
-                />
-
-                {/* Main Track Background */}
-                <circle
-                  cx="400"
-                  cy="400"
-                  r={trackRadius}
-                  fill="none"
-                  stroke="url(#trackGradient)"
-                  strokeWidth={trackWidth}
-                  className="backdrop-blur-sm"
-                />
-                <circle
-                  cx="400"
-                  cy="400"
-                  r={innerRadius}
-                  fill="none"
-                  stroke="rgba(255,255,255,0.05)"
-                  strokeWidth="1"
-                />
-                <circle
-                  cx="400"
-                  cy="400"
-                  r={innerRadius2}
-                  fill="none"
-                  stroke="rgba(255,255,255,0.05)"
-                  strokeWidth="1"
-                />
-
-                {trackCoords.map((pos, i) => {
-                  const tile = boardTiles[i];
-                  const startPIdx =
-                    i % (totalSteps / numPlayers) === 0
-                      ? i / (totalSteps / numPlayers)
-                      : -1;
-                  const isCustom = tile?.id === "CUSTOM";
-                  const isStart = startPIdx >= 0;
-                  const shouldShowAsEvent = triggerEventEveryStep && !isStart;
-
-                  let fill = "rgba(255,255,255,0.25)";
-                  let stroke = "none";
-                  let radius = 3;
-                  let filter = "";
-
-                  if (isStart) {
-                    fill = COLORS[startPIdx].hex;
-                    radius = 8;
-                    filter = "url(#glow)";
-                  } else if (isCustom || shouldShowAsEvent) {
-                    fill = "#D355FF";
-                    radius = 5;
-                    filter = "url(#glow)";
-                  }
-
-                  return (
-                    <g key={i}>
-                      {isStart && (
-                        <circle
-                          cx={pos.x}
-                          cy={pos.y}
-                          r={12}
-                          fill="transparent"
-                          stroke={fill}
-                          strokeWidth="1"
-                          opacity="0.5"
-                        />
-                      )}
-                      <circle
-                        cx={pos.x}
-                        cy={pos.y}
-                        r={radius}
-                        fill={fill}
-                        filter={filter}
-                        className="transition-all duration-300"
-                      />
-                    </g>
-                  );
-                })}
-              </svg>
-
-              {players.map((p, i) => {
-                let x, y;
-                if (p.pos === -1) {
-                  const node =
-                    trackCoords[Math.floor(totalSteps / numPlayers) * i];
-                  const angle = Math.atan2(
-                    node.y - center.y,
-                    node.x - center.x,
-                  );
-                  x = node.x + Math.cos(angle) * 50;
-                  y = node.y + Math.sin(angle) * 50;
-                } else {
-                  const node = trackCoords[p.pos % totalSteps];
-                  x = node.x;
-                  y = node.y;
-                }
-                return (
-                  <div
-                    key={i}
-                    ref={(el) => {
-                      if (piecesRef.current) {
-                        piecesRef.current[i] = el;
-                      }
-                    }}
-                    className="absolute w-10 h-10 -ml-5 -mt-5 flex items-center justify-center transition-all duration-500 ease-out"
-                    style={{
-                      left: `${(x / 800) * 100}%`,
-                      top: `${(y / 800) * 100}%`,
-                      zIndex: i === turn ? 50 + i : 30 + i,
-                    }}>
-                    <div
-                      className="w-full h-full rounded-full border-2 border-white flex items-center justify-center bg-black/50 relative"
-                      style={{
-                        borderColor: p.color.hex,
-                        boxShadow:
-                          i === turn ? `0 0 15px ${p.color.hex}` : "none",
-                      }}>
-                      {/* 卡牌效果emoji */}
-                      {cardEffectDisplay[i] &&
-                        cardEffectDisplay[i].hideTime > Date.now() && (
-                          <div
-                            className="absolute text-sm font-bold"
-                            style={{
-                              animation: `cardEffectFade 1s ease-out forwards`,
-                            }}>
-                            {cardEffectDisplay[i].emoji}
-                          </div>
-                        )}
-                      <div className="w-2 h-2 rounded-full bg-white" />
-                    </div>
-                  </div>
-                );
-              })}
-
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="flex flex-col items-center gap-8 pointer-events-auto">
-                  <div
-                    className="dice-container w-16 h-16 sm:w-24 sm:h-24 cursor-pointer"
-                    onClick={handleRollDice}>
-                    <div
-                      ref={diceRef}
-                      className="dice-3d w-full h-full relative preserve-3d">
-                      <div className="dice-face dice-face-1 bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border-cyan-400/50 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.5)]">
-                        <Dice1 size={32} className="sm:size-[48px]" />
-                      </div>
-                      <div className="dice-face dice-face-2 bg-gradient-to-br from-purple-500/20 to-pink-600/20 border-purple-400/50 text-purple-400">
-                        <Dice2 size={32} className="sm:size-[48px]" />
-                      </div>
-                      <div className="dice-face dice-face-3 bg-gradient-to-br from-green-500/20 to-emerald-600/20 border-green-400/50 text-green-400">
-                        <Dice3 size={32} className="sm:size-[48px]" />
-                      </div>
-                      <div className="dice-face dice-face-4 bg-gradient-to-br from-yellow-500/20 to-orange-600/20 border-yellow-400/50 text-yellow-400">
-                        <Dice4 size={32} className="sm:size-[48px]" />
-                      </div>
-                      <div className="dice-face dice-face-5 bg-gradient-to-br from-red-500/20 to-rose-600/20 border-red-400/50 text-red-400">
-                        <Dice5 size={32} className="sm:size-[48px]" />
-                      </div>
-                      <div className="dice-face dice-face-6 bg-gradient-to-br from-indigo-500/20 to-violet-600/20 border-indigo-400/50 text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.5)]">
-                        <Dice6 size={32} className="sm:size-[48px]" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {!isRolling && !isMoving && !pickingTargetFor && (
-                    <button
-                      onClick={() => setShowCardDrawer(true)}
-                      className="glass-btn px-4 py-2 sm:px-8 sm:py-3 rounded-full text-[10px] sm:text-xs font-bold tracking-[0.2em] flex items-center gap-2 sm:gap-3 text-white shadow-[0_0_20px_rgba(139,92,246,0.3)] hover:shadow-[0_0_30px_rgba(139,92,246,0.5)] border-purple-500/30 animate-float bg-gradient-to-r from-purple-900/40 to-blue-900/40">
-                      <CreditCard
-                        size={12}
-                        className="sm:size-[14px] text-purple-300"
-                      />
-                      {t.game.handCards}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* 右侧边栏 - 游戏信息 (仅PC端) */}
-            {isPC && (
-              <div className="w-64 h-full flex flex-col gap-4 pt-28 pb-8">
-                {/* 游戏信息 */}
-                <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-4">
-                  <h3 className="text-sm font-bold mb-3 text-cyan-400 flex items-center gap-2">
-                    <Trophy size={16} />
-                    {t.game?.gameInfo || '游戏信息'}
-                  </h3>
-                  <div className="space-y-2 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">{t.game?.currentRound || '当前回合'}:</span>
-                      <span className="text-white font-mono">{turn + 1} / {numPlayers}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">{t.game?.totalLaps || '目标圈数'}:</span>
-                      <span className="text-white font-mono">{lapsToWin}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">{t.game?.lastDice || '上次掷骰'}:</span>
-                      <span className="text-white font-mono">{diceValue}</span>
-                    </div>
-                  </div>
-                </div>
               </div>
             )}
 
-            {showCardDrawer && (
-              <div
-                className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-end animate-fade-in"
-                onClick={() => setShowCardDrawer(false)}>
-                <div
-                  className="w-full bg-[#0a0a1a] rounded-t-3xl border-t border-white/10 p-6 pt-10 relative"
-                  onClick={(e) => e.stopPropagation()}>
-                  <div className="flex justify-between items-center mb-6 px-2">
-                    <h3 className="font-black text-sm tracking-widest flex items-center gap-2 uppercase">
-                      <Star size={16} className="text-yellow-400" />{" "}
-                      {t.game.handCardsListTitle}
-                    </h3>
-                    <button
-                      onClick={() => setShowCardDrawer(false)}
-                      className="text-gray-500 p-1">
-                      <X size={20} />
-                    </button>
-                  </div>
-                  <div className="flex gap-4 overflow-x-auto no-scrollbar pb-6 px-2">
-                    {players[turn].cards.map((card) => (
-                      <div
-                        key={card.instanceId}
-                        onClick={() => !hasUsedCard && useCard(card)}
-                        className={`min-w-[140px] h-44 rounded-xl border-2 p-3 flex flex-col justify-between transition-all active:scale-95 cursor-pointer relative overflow-hidden bg-white/5 border-white/10 hover:border-white/30 shadow-lg ${
-                          hasUsedCard
-                            ? "opacity-50 grayscale cursor-not-allowed"
-                            : ""
-                        }`}>
-                        <div className="flex justify-between items-start">
-                          <span
-                            className={`text-[10px] font-black px-1 rounded border ${RARITY_CONFIG[card.rarity].color}`}
-                            style={{
-                              borderColor: RARITY_CONFIG[card.rarity].color,
-                              color: RARITY_CONFIG[card.rarity].color,
-                            }}>
-                            {card.rarity}
-                          </span>
-                          <div className="text-2xl">{card.pattern}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs font-black mb-1">
-                            {card.name}
-                          </div>
-                          <div className="text-[9px] text-gray-400 leading-tight">
-                            {card.desc}
-                          </div>
-                        </div>
-                        <div className="text-[8px] text-gray-500 flex items-center gap-1 uppercase tracking-tighter">
-                          <Target size={8} /> {card.target}
-                        </div>
-                      </div>
-                    ))}
-                    {players[turn].cards.length === 0 && (
-                      <div className="w-full text-center py-10 text-gray-600 text-xs italic">
-                        {t.game.noAvailableCards}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {showLogs && (
-              <div
-                ref={logsContainerRef}
-                className={`fixed bottom-12 sm:bottom-24 z-[60] bg-black/80 backdrop-blur-xl border border-white/10 rounded-2xl p-4 animate-slide-up max-h-[15vh] overflow-y-auto custom-scrollbar ${isPC ? 'left-8 right-8 max-w-[1400px] mx-auto' : 'inset-x-4'}`}>
-                <div className="space-y-1.5">
-                  {logs.map((l, i) => (
-                    <div
-                      key={i}
-                      className="text-[11px] text-gray-300 font-mono opacity-80 border-l border-white/20 pl-2">
-                      {l}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-          </div>
-        )}
-
-        {phase === "event" && activeEvent && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/95 backdrop-blur-xl p-6 animate-fade-in text-center">
+            {/* Game Board */}
             <div
-              className="w-full max-w-sm rounded-3xl p-8 shadow-2xl relative overflow-hidden border-2"
-              style={{
-                backgroundColor: "#1a1a2e",
-                borderColor: activeEvent.color || "#06b6d4",
-              }}>
-              <div
-                className="absolute inset-0 pointer-events-none opacity-5"
-                style={{
-                  backgroundColor: activeEvent.color || "#a855f7",
-                }}></div>
-              <div
-                className="inline-block px-3 py-1 text-[10px] font-black tracking-widest rounded-full mb-6 border uppercase italic"
-                style={{
-                  backgroundColor: `${activeEvent.color || "#06b6d4"}20`,
-                  color: activeEvent.color || "#06b6d4",
-                  borderColor: `${activeEvent.color || "#06b6d4"}50`,
-                }}>
-                Event Anomaly
-              </div>
-              <h2 className="text-2xl font-black mb-8 leading-relaxed text-white">
-                {activeEvent.text}
-              </h2>
-              <button
-                onClick={() => {
-                  // 确定受影响的玩家索引
-                  const getAffectedPlayerIndices = (): number[] => {
-                    const target = activeEvent.target || "SELF";
-                    if (target === "SELF") {
-                      return [turn];
-                    } else if (target === "ALL_PLAYERS") {
-                      return Array.from({ length: numPlayers }, (_, i) => i);
-                    } else if (target === "RANDOM_OTHER") {
-                      const others = Array.from(
-                        { length: numPlayers },
-                        (_, i) => i,
-                      ).filter((i) => i !== turn);
-                      if (others.length === 0) return [];
-                      return [
-                        others[Math.floor(Math.random() * others.length)],
-                      ];
-                    }
-                    return [turn];
-                  };
+              className={`relative ${isPC ? "flex-1 max-w-[min(70vh,750px)] mt-32" : "w-full max-w-[min(95vw,450px)] md:max-w-[min(85vw,650px)]"} aspect-square`}>
+              <GameBoard
+                trackCoords={trackCoords}
+                boardTiles={boardTiles}
+                totalSteps={totalSteps}
+                numPlayers={numPlayers}
+                trackRadius={trackRadius}
+                decorativeRadius1={decorativeRadius1}
+                decorativeRadius2={decorativeRadius2}
+                trackWidth={trackWidth}
+                innerRadius={innerRadius}
+                innerRadius2={innerRadius2}
+                triggerEventEveryStep={triggerEventEveryStep}
+                center={center}
+                isPC={isPC}
+              />
 
-                  const affectedIndices = getAffectedPlayerIndices();
+              <GamePieces
+                players={players}
+                trackCoords={trackCoords}
+                totalSteps={totalSteps}
+                turn={turn}
+                isMoving={isMoving}
+                cardEffectDisplay={cardEffectDisplay}
+                piecesRef={piecesRef}
+              />
 
-                  // 应用事件效果
-                  if (activeEvent.type === "MOVE" && activeEvent.val !== 0) {
-                    // 移动效果：更新受影响玩家的位置
-                    setPlayers((prev) => {
-                      const next = [...prev];
-                      affectedIndices.forEach((idx) => {
-                        const newPosition = calculateNewPosition(
-                          next[idx],
-                          activeEvent.val,
-                        );
-                        next[idx] = {
-                          ...next[idx],
-                          pos: newPosition.pos,
-                          lap: newPosition.lap,
-                        };
-                      });
-                      return next;
-                    });
-                    addLog(
-                      `Event: ${affectedIndices.map((i) => `Player ${i + 1}`).join(", ")} moved ${activeEvent.val > 0 ? "+" : ""}${activeEvent.val}`,
-                    );
-                    // 播放移动动画（只播放当前玩家或第一个受影响玩家）
-                    animatePieceMove(affectedIndices[0] ?? turn, () => {
-                      setPhase("playing");
-                      setTurn((turn + 1) % numPlayers);
-                      setIsMoving(false);
-                      setActiveEvent(null);
-                      setHasUsedCard(false);
-                    });
-                  } else if (activeEvent.type === "SKIP") {
-                    // 暂停效果：设置 skipTurn
-                    setPlayers((prev) => {
-                      const next = [...prev];
-                      affectedIndices.forEach((idx) => {
-                        next[idx] = { ...next[idx], skipTurn: true };
-                      });
-                      return next;
-                    });
-                    addLog(
-                      `Event: ${affectedIndices.map((i) => `Player ${i + 1}`).join(", ")} will skip next turn`,
-                    );
-                    setPhase("playing");
-                    setTurn((turn + 1) % numPlayers);
-                    setIsMoving(false);
-                    setActiveEvent(null);
-                    setHasUsedCard(false);
-                  } else if (activeEvent.type === "RESTART_LAP") {
-                    // 回到本圈起点
-                    setPlayers((prev) => {
-                      const next = [...prev];
-                      affectedIndices.forEach((idx) => {
-                        const currentPlayer = next[idx];
-                        // 计算本圈起始位置
-                        const lapStartDistance = currentPlayer.lap * totalSteps;
-                        const lapStartPos =
-                          (currentPlayer.startPos + lapStartDistance) %
-                          totalSteps;
-                        next[idx] = {
-                          ...next[idx],
-                          pos: lapStartPos,
-                        };
-                      });
-                      return next;
-                    });
-                    addLog(
-                      `Event: ${affectedIndices.map((i) => `Player ${i + 1}`).join(", ")} returned to lap start`,
-                    );
-                    // 播放移动动画
-                    animatePieceMove(affectedIndices[0] ?? turn, () => {
-                      setPhase("playing");
-                      setTurn((turn + 1) % numPlayers);
-                      setIsMoving(false);
-                      setActiveEvent(null);
-                      setHasUsedCard(false);
-                    });
-                  } else {
-                    // NONE 类型或其他：无游戏效果
-                    addLog(`Event: ${activeEvent.text}`);
-                    setPhase("playing");
-                    setTurn((turn + 1) % numPlayers);
-                    setIsMoving(false);
-                    setActiveEvent(null);
-                    setHasUsedCard(false);
-                  }
-                }}
-                className="w-full py-4 bg-white text-black font-black rounded-xl active:scale-95 shadow-xl transition-all">
-                {t.game.taskComplete}
-              </button>
+              <DiceControl
+                diceValue={diceValue}
+                isRolling={isRolling}
+                isMoving={isMoving}
+                pickingTargetFor={pickingTargetFor}
+                hasUsedCard={hasUsedCard}
+                players={players}
+                turn={turn}
+                diceRef={diceRef}
+                handleRollDice={handleRollDice}
+                setShowCardDrawer={setShowCardDrawer}
+                t={t.game}
+                isPC={isPC}
+              />
             </div>
+
+            {/* Game Info Sidebar (PC only) */}
+            {isPC && (
+              <GameInfoSidebar
+                turn={turn}
+                numPlayers={numPlayers}
+                lapsToWin={lapsToWin}
+                diceValue={diceValue}
+                t={t.game}
+              />
+            )}
+
+            <CardDrawer
+              players={players}
+              turn={turn}
+              hasUsedCard={hasUsedCard}
+              showCardDrawer={showCardDrawer}
+              useCard={useCard}
+              setShowCardDrawer={setShowCardDrawer}
+              t={t.game}
+            />
+
+            <GameLog
+              logs={logs}
+              showLogs={showLogs}
+              logsContainerRef={logsContainerRef}
+              isPC={isPC}
+            />
           </div>
         )}
+
+        <EventModal
+          activeEvent={activeEvent}
+          applyEventEffect={() => {
+            if (!activeEvent) return;
+            // 确定受影响的玩家索引
+            const getAffectedPlayerIndices = (): number[] => {
+              const target = activeEvent.target || "SELF";
+              if (target === "SELF") {
+                return [turn];
+              } else if (target === "ALL_PLAYERS") {
+                return Array.from({ length: numPlayers }, (_, i) => i);
+              } else if (target === "RANDOM_OTHER") {
+                const others = Array.from(
+                  { length: numPlayers },
+                  (_, i) => i,
+                ).filter((i) => i !== turn);
+                if (others.length === 0) return [];
+                return [others[Math.floor(Math.random() * others.length)]];
+              }
+              return [turn];
+            };
+
+            const affectedIndices = getAffectedPlayerIndices();
+
+            // 应用事件效果
+            if (activeEvent.type === "MOVE" && activeEvent.val !== 0) {
+              // 移动效果：更新受影响玩家的位置
+              setPlayers((prev) => {
+                const next = [...prev];
+                affectedIndices.forEach((idx) => {
+                  const newPosition = calculateNewPosition(
+                    next[idx],
+                    activeEvent.val,
+                  );
+                  next[idx] = {
+                    ...next[idx],
+                    pos: newPosition.pos,
+                    lap: newPosition.lap,
+                  };
+                });
+                return next;
+              });
+              addLog(
+                `Event: ${affectedIndices.map((i) => `Player ${i + 1}`).join(", ")} moved ${activeEvent.val > 0 ? "+" : ""}${activeEvent.val}`,
+              );
+              // 播放移动动画（只播放当前玩家或第一个受影响玩家）
+              animatePieceMove(affectedIndices[0] ?? turn, () => {
+                setPhase("playing");
+                setTurn((turn + 1) % numPlayers);
+                setIsMoving(false);
+                setActiveEvent(null);
+                setHasUsedCard(false);
+              });
+            } else if (activeEvent.type === "SKIP") {
+              // 暂停效果：设置 skipTurn
+              setPlayers((prev) => {
+                const next = [...prev];
+                affectedIndices.forEach((idx) => {
+                  next[idx] = { ...next[idx], skipTurn: true };
+                });
+                return next;
+              });
+              addLog(
+                `Event: ${affectedIndices.map((i) => `Player ${i + 1}`).join(", ")} will skip next turn`,
+              );
+              setPhase("playing");
+              setTurn((turn + 1) % numPlayers);
+              setIsMoving(false);
+              setActiveEvent(null);
+              setHasUsedCard(false);
+            } else if (activeEvent.type === "RESTART_LAP") {
+              // 回到本圈起点
+              setPlayers((prev) => {
+                const next = [...prev];
+                affectedIndices.forEach((idx) => {
+                  const currentPlayer = next[idx];
+                  // 计算本圈起始位置
+                  const lapStartDistance = currentPlayer.lap * totalSteps;
+                  const lapStartPos =
+                    (currentPlayer.startPos + lapStartDistance) % totalSteps;
+                  next[idx] = {
+                    ...next[idx],
+                    pos: lapStartPos,
+                  };
+                });
+                return next;
+              });
+              addLog(
+                `Event: ${affectedIndices.map((i) => `Player ${i + 1}`).join(", ")} returned to lap start`,
+              );
+              // 播放移动动画
+              animatePieceMove(affectedIndices[0] ?? turn, () => {
+                setPhase("playing");
+                setTurn((turn + 1) % numPlayers);
+                setIsMoving(false);
+                setActiveEvent(null);
+                setHasUsedCard(false);
+              });
+            } else {
+              // NONE 类型或其他：无游戏效果
+              addLog(`Event: ${activeEvent.text}`);
+              setPhase("playing");
+              setTurn((turn + 1) % numPlayers);
+              setIsMoving(false);
+              setActiveEvent(null);
+              setHasUsedCard(false);
+            }
+          }}
+          t={t.game}
+        />
 
         {showExitConfirm && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">
@@ -1404,44 +1026,12 @@ export default function App() {
           </div>
         )}
 
-        {phase === "win" && winner && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/95 backdrop-blur-2xl animate-fade-in text-center p-6 bg-[url('https://images.unsplash.com/photo-1534796636912-3b95b3ab5986?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80')] bg-cover bg-center">
-            <div className="absolute inset-0 bg-black/80"></div>
-            <div className="relative glass-panel rounded-3xl p-12 max-w-lg w-full border-t border-yellow-500/30 shadow-[0_0_100px_rgba(234,179,8,0.2)]">
-              <div className="animate-float mb-8 inline-block relative">
-                <div className="absolute inset-0 bg-yellow-500 blur-3xl opacity-20 rounded-full"></div>
-                <Trophy
-                  size={100}
-                  className="text-yellow-400 relative drop-shadow-[0_0_20px_rgba(250,204,21,0.8)]"
-                />
-              </div>
-
-              <h2 className="text-6xl font-black italic mb-4 uppercase tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-yellow-600 drop-shadow-sm">
-                {t.game.victory}
-              </h2>
-
-              <div className="w-full h-px bg-gradient-to-r from-transparent via-yellow-500/50 to-transparent my-8"></div>
-
-              <p className="text-xl text-gray-300 mb-12 font-light tracking-widest">
-                <span
-                  style={{
-                    color: winner.color.hex,
-                    textShadow: `0 0 20px ${winner.color.hex}`,
-                  }}
-                  className="font-bold text-3xl block mb-2">
-                  Pilot P{winner.id + 1}
-                </span>{" "}
-                Won the Orbit
-              </p>
-
-              <button
-                onClick={() => setPhase("setup")}
-                className="w-full py-4 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl font-black text-lg uppercase tracking-widest shadow-[0_0_30px_rgba(234,179,8,0.4)] hover:shadow-[0_0_50px_rgba(234,179,8,0.6)] active:scale-95 transition-all">
-                {t.game.restartGame}
-              </button>
-            </div>
-          </div>
-        )}
+        <WinScreen
+          winner={winner}
+          winnerIndex={players.findIndex((p) => p === winner)}
+          setPhase={setPhase}
+          t={t.game}
+        />
 
         {/* 目标选择器 */}
         {pickingTargetFor && (
