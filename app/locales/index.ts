@@ -19,6 +19,7 @@ export interface Translations {
     eventDensity: string;
     eventDensityLow: string;
     eventDensityHigh: string;
+    onlyCustomTiles: string;
     manageLibraries: string;
     startGame: string;
   };
@@ -72,10 +73,13 @@ export interface Translations {
     save: string;
     createNew: string;
     name: string;
+    namePlaceholder: string;
     emoji: string;
     description: string;
+    descriptionPlaceholder: string;
     rarity: string;
     target: string;
+    targetLabel: string;
     targetSelf: string;
     targetPickOne: string;
     targetRandomOther: string;
@@ -84,6 +88,15 @@ export interface Translations {
     moveDistance: string;
     moveHint: string;
     addCard: string;
+    moveButton: string;
+    skipButton: string;
+    restartButton: string;
+    moveForward: string;
+    moveBackward: string;
+    moveNone: string;
+    skipTurnEffect: string;
+    restartEffect: string;
+    noEffect: string;
   };
 
   // Event Editor
@@ -118,6 +131,7 @@ export interface Translations {
     cardUsed: string;
     eventAnomaly: string;
     victory: string;
+    victoryAchieved: string;
     pilotWonOrbit: string;
     restartGame: string;
     collision: string;
@@ -131,6 +145,11 @@ export interface Translations {
     selectTarget: string;
     randomizing: string;
     allTargets: string;
+    eventTriggered: string;
+    eventTarget: string;
+    targetSelfEmoji: string;
+    targetAllPlayersEmoji: string;
+    targetRandomOtherEmoji: string;
   };
 
   // Player names
@@ -155,6 +174,7 @@ const zh: Translations = {
     eventDensity: "事件密度",
     eventDensityLow: "低密度：事件较稀少",
     eventDensityHigh: "高密度：步步惊心",
+    onlyCustomTiles: "仅在部分格子触发事件",
     manageLibraries: "库管理",
     startGame: "启动任务",
   },
@@ -202,10 +222,13 @@ const zh: Translations = {
     save: "保存并返回",
     createNew: "设计新武器",
     name: "名称",
+    namePlaceholder: "卡牌名称",
     emoji: "Emoji",
     description: "描述",
+    descriptionPlaceholder: "描述卡牌效果...",
     rarity: "稀有度",
     target: "目标",
+    targetLabel: "目标:",
     targetSelf: "自己",
     targetPickOne: "指定一人",
     targetRandomOther: "随机对手",
@@ -214,6 +237,15 @@ const zh: Translations = {
     moveDistance: "移动格数",
     moveHint: "正数前进，负数后退",
     addCard: "确认添加",
+    moveButton: "移动",
+    skipButton: "暂停",
+    restartButton: "重启",
+    moveForward: "前进 {steps} 格",
+    moveBackward: "后退 {steps} 格",
+    moveNone: "原地不动",
+    skipTurnEffect: "暂停一回合",
+    restartEffect: "回到起点",
+    noEffect: "无效果",
   },
   eventEditor: {
     title: "事件编辑器",
@@ -244,6 +276,7 @@ const zh: Translations = {
     cardUsed: "{name} 使用了 [{card}]",
     eventAnomaly: "Event Anomaly",
     victory: "Victory",
+    victoryAchieved: "获得胜利",
     pilotWonOrbit: "Pilot P{id} Won the Orbit",
     restartGame: "Restart Game",
     collision: "💥 撞击！P{id} 重启",
@@ -257,6 +290,11 @@ const zh: Translations = {
     selectTarget: "选择目标",
     randomizing: "随机选择中...",
     allTargets: "所有玩家",
+    eventTriggered: "事件触发",
+    eventTarget: "影响目标:",
+    targetSelfEmoji: "👤 自己",
+    targetAllPlayersEmoji: "🌟 所有玩家",
+    targetRandomOtherEmoji: "🎲 随机对手",
   },
   player: "玩家",
   circle: "圈",
@@ -279,6 +317,7 @@ const en: Translations = {
     eventDensity: "Event Density",
     eventDensityLow: "Low Density: Rare Events",
     eventDensityHigh: "High Density: Event Every Step",
+    onlyCustomTiles: "Only on Some Tiles",
     manageLibraries: "Manage Libraries",
     startGame: "Start Game",
   },
@@ -327,10 +366,13 @@ const en: Translations = {
     save: "Save and Return",
     createNew: "Design New Card",
     name: "Name",
+    namePlaceholder: "Card Name",
     emoji: "Emoji",
     description: "Description",
+    descriptionPlaceholder: "Describe card effect...",
     rarity: "Rarity",
     target: "Target",
+    targetLabel: "Target:",
     targetSelf: "Self",
     targetPickOne: "Pick One",
     targetRandomOther: "Random Other",
@@ -339,6 +381,15 @@ const en: Translations = {
     moveDistance: "Move Steps",
     moveHint: "Positive to advance, negative to retreat",
     addCard: "Add Card",
+    moveButton: "Move",
+    skipButton: "Skip",
+    restartButton: "Restart",
+    moveForward: "Advance {steps} steps",
+    moveBackward: "Retreat {steps} steps",
+    moveNone: "No Movement",
+    skipTurnEffect: "Skip One Turn",
+    restartEffect: "Back to Start",
+    noEffect: "No Effect",
   },
   eventEditor: {
     title: "Event Editor",
@@ -369,6 +420,7 @@ const en: Translations = {
     cardUsed: "{name} used [{card}]",
     eventAnomaly: "Event Anomaly",
     victory: "Victory",
+    victoryAchieved: "Won Victory",
     pilotWonOrbit: "Pilot P{id} Won the Orbit",
     restartGame: "Restart Game",
     collision: "💥 Collision! P{id} Restarted",
@@ -382,6 +434,11 @@ const en: Translations = {
     selectTarget: "Select Target",
     randomizing: "Randomizing...",
     allTargets: "All Players",
+    eventTriggered: "Event Triggered",
+    eventTarget: "Affects:",
+    targetSelfEmoji: "👤 Self",
+    targetAllPlayersEmoji: "🌟 All Players",
+    targetRandomOtherEmoji: "🎲 Random Opponent",
   },
   player: "Player",
   circle: "Circle",
@@ -404,6 +461,7 @@ const ja: Translations = {
     eventDensity: "イベント密度",
     eventDensityLow: "低密度：イベントが少ない",
     eventDensityHigh: "高密度：毎ステップイベント",
+    onlyCustomTiles: "一部のタイルのみ",
     manageLibraries: "ライブラリ管理",
     startGame: "ゲーム開始",
   },
@@ -452,10 +510,13 @@ const ja: Translations = {
     save: "保存して戻る",
     createNew: "新しいカードを設計",
     name: "名前",
+    namePlaceholder: "カード名",
     emoji: "絵文字",
     description: "説明",
+    descriptionPlaceholder: "カード効果を説明...",
     rarity: "レアリティ",
     target: "ターゲット",
+    targetLabel: "ターゲット:",
     targetSelf: "自分自身",
     targetPickOne: "1人選択",
     targetRandomOther: "ランダムな相手",
@@ -464,6 +525,15 @@ const ja: Translations = {
     moveDistance: "移動ステップ",
     moveHint: "正の数で前進、負の数で後退",
     addCard: "カードを追加",
+    moveButton: "移動",
+    skipButton: "スキップ",
+    restartButton: "リスタート",
+    moveForward: "{steps} ステップ前進",
+    moveBackward: "{steps} ステップ後退",
+    moveNone: "移動なし",
+    skipTurnEffect: "1ターンスキップ",
+    restartEffect: "スタート地点に戻る",
+    noEffect: "効果なし",
   },
   eventEditor: {
     title: "イベントエディタ",
@@ -494,6 +564,7 @@ const ja: Translations = {
     cardUsed: "{name}は[{card}]を使用しました",
     eventAnomaly: "イベント異常",
     victory: "勝利",
+    victoryAchieved: "勝利を獲得",
     pilotWonOrbit: "パイロットP{id}が軌道を征服",
     restartGame: "ゲーム再開",
     collision: "💥 衝突！P{id} リスタート",
@@ -508,6 +579,11 @@ const ja: Translations = {
     selectTarget: "ターゲットを選択",
     randomizing: "ランダム選択中...",
     allTargets: "全プレイヤー",
+    eventTriggered: "イベント発動",
+    eventTarget: "影響対象:",
+    targetSelfEmoji: "👤 自分",
+    targetAllPlayersEmoji: "🌟 全プレイヤー",
+    targetRandomOtherEmoji: "🎲 ランダム相手",
   },
   player: "プレイヤー",
   circle: "ラップ",
@@ -530,6 +606,7 @@ const fr: Translations = {
     eventDensity: "Densité d'événements",
     eventDensityLow: "Faible densité : événements rares",
     eventDensityHigh: "Haute densité : événement chaque étape",
+    onlyCustomTiles: "Seulement sur certaines cases",
     manageLibraries: "Gérer les bibliothèques",
     startGame: "Commencer le jeu",
   },
@@ -579,10 +656,13 @@ const fr: Translations = {
     save: "Enregistrer et retour",
     createNew: "Concevoir une nouvelle carte",
     name: "Nom",
+    namePlaceholder: "Nom de la carte",
     emoji: "Emoji",
     description: "Description",
+    descriptionPlaceholder: "Décrire l'effet de la carte...",
     rarity: "Rareté",
     target: "Cible",
+    targetLabel: "Cible:",
     targetSelf: "Soi-même",
     targetPickOne: "Choisir un",
     targetRandomOther: "Adversaire aléatoire",
@@ -591,6 +671,15 @@ const fr: Translations = {
     moveDistance: "Étapes de mouvement",
     moveHint: "Positif pour avancer, négatif pour reculer",
     addCard: "Ajouter une carte",
+    moveButton: "Mouvement",
+    skipButton: "Sauter",
+    restartButton: "Redémarrage",
+    moveForward: "Avancer {steps} étapes",
+    moveBackward: "Reculer {steps} étapes",
+    moveNone: "Pas de mouvement",
+    skipTurnEffect: "Sauter un tour",
+    restartEffect: "Retour au début",
+    noEffect: "Pas d'effet",
   },
   eventEditor: {
     title: "Éditeur d'événements",
@@ -621,6 +710,7 @@ const fr: Translations = {
     cardUsed: "{name} a utilisé [{card}]",
     eventAnomaly: "Anomalie d'événement",
     victory: "Victoire",
+    victoryAchieved: "A remporté la victoire",
     pilotWonOrbit: "Le pilote P{id} a remporté l'orbite",
     restartGame: "Redémarrer le jeu",
     collision: "💥 Collision! P{id} Redémarrage",
@@ -635,6 +725,11 @@ const fr: Translations = {
     selectTarget: "Sélectionner la cible",
     randomizing: "Sélection aléatoire...",
     allTargets: "Tous les joueurs",
+    eventTriggered: "Événement déclenché",
+    eventTarget: "Affecte:",
+    targetSelfEmoji: "👤 Soi-même",
+    targetAllPlayersEmoji: "🌟 Tous les joueurs",
+    targetRandomOtherEmoji: "🎲 Adversaire aléatoire",
   },
   player: "Joueur",
   circle: "Tour",

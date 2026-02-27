@@ -1,10 +1,7 @@
 "use client";
 
 import React from "react";
-import {
-  Target,
-  Upload,
-} from "lucide-react";
+import { Target, Upload } from "lucide-react";
 import type { Translations } from "@/app/locales";
 
 interface GameSetupProps {
@@ -88,7 +85,7 @@ export default function GameSetup({
           />
           <p className="text-[9px] text-gray-500 mt-2">
             {eventDensity === 0
-              ? "仅在部分格子触发事件"
+              ? t.setup.onlyCustomTiles
               : eventDensity === 100
                 ? t.setup.eventDensityHigh
                 : `${eventDensity}% 概率在每步触发事件`}

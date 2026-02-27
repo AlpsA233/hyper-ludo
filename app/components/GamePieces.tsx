@@ -8,7 +8,10 @@ interface GamePiecesProps {
   totalSteps: number;
   turn: number;
   isMoving: boolean;
-  cardEffectDisplay: Record<number, { emoji: string; hideTime: number } | string>;
+  cardEffectDisplay: Record<
+    number,
+    { emoji: string; hideTime: number } | string
+  >;
   piecesRef: React.RefObject<(HTMLDivElement | null)[]>;
 }
 

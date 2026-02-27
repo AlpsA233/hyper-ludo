@@ -65,14 +65,17 @@ export default function CardEditor({
   const getEffectDisplay = (effect: CardEffect) => {
     if (effect.move !== undefined) {
       return effect.move > 0
-        ? `前进 ${effect.move} 格`
+        ? t.cardEditor.moveForward.replace("{steps}", String(effect.move))
         : effect.move < 0
-          ? `后退 ${Math.abs(effect.move)} 格`
-          : "原地不动";
+          ? t.cardEditor.moveBackward.replace(
+              "{steps}",
+              String(Math.abs(effect.move)),
+            )
+          : t.cardEditor.moveNone;
     }
-    if (effect.skip) return "暂停一回合";
-    if (effect.restart) return "回到起点";
-    return "无效果";
+    if (effect.skip) return t.cardEditor.skipTurnEffect;
+    if (effect.restart) return t.cardEditor.restartEffect;
+    return t.cardEditor.noEffect;
   };
 
   return (
@@ -107,7 +110,7 @@ export default function CardEditor({
                     setNewItem({ ...newItem, name: e.target.value })
                   }
                   className="w-full bg-black/40 border border-white/10 rounded p-2 text-xs focus:border-cyan-500 focus:outline-none transition-colors"
-                  placeholder="卡牌名称"
+                  placeholder={t.cardEditor.namePlaceholder}
                 />
               </div>
               <div>
@@ -136,7 +139,7 @@ export default function CardEditor({
                   setNewItem({ ...newItem, desc: e.target.value })
                 }
                 className="w-full bg-black/40 border border-white/10 rounded p-2 text-xs h-16 focus:border-cyan-500 focus:outline-none transition-colors resize-none"
-                placeholder="描述卡牌效果..."
+                placeholder={t.cardEditor.descriptionPlaceholder}
               />
             </div>
 
@@ -204,7 +207,7 @@ export default function CardEditor({
                       ? "bg-cyan-500/20 border-cyan-500 text-cyan-400"
                       : "bg-black/40 border-white/10 text-gray-400 hover:border-white/30"
                   }`}>
-                  移动
+                  {t.cardEditor.moveButton}
                 </button>
                 <button
                   onClick={() => handleEffectTypeChange("skip")}
@@ -213,7 +216,7 @@ export default function CardEditor({
                       ? "bg-yellow-500/20 border-yellow-500 text-yellow-400"
                       : "bg-black/40 border-white/10 text-gray-400 hover:border-white/30"
                   }`}>
-                  暂停
+                  {t.cardEditor.skipButton}
                 </button>
                 <button
                   onClick={() => handleEffectTypeChange("restart")}
@@ -222,7 +225,7 @@ export default function CardEditor({
                       ? "bg-red-500/20 border-red-500 text-red-400"
                       : "bg-black/40 border-white/10 text-gray-400 hover:border-white/30"
                   }`}>
-                  重启
+                  {t.cardEditor.restartButton}
                 </button>
               </div>
             </div>
@@ -284,7 +287,9 @@ export default function CardEditor({
                     </div>
                     <div className="text-[10px] text-gray-500">{card.desc}</div>
                     <div className="text-[9px] text-gray-600 mt-1 flex items-center gap-2">
-                      <span>目标: {card.target}</span>
+                      <span>
+                        {t.cardEditor.targetLabel} {card.target}
+                      </span>
                       <span>·</span>
                       <span className="text-cyan-400">
                         {getEffectDisplay(card.effect)}

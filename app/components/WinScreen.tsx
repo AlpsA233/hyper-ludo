@@ -57,7 +57,9 @@ export default function WinScreen({
             </div>
             <div className="text-left">
               <p className="text-5xl font-bold text-white">{winner.name}</p>
-              <p className="text-xl text-yellow-200 mt-2">获得胜利</p>
+              <p className="text-xl text-yellow-200 mt-2">
+                {t.victoryAchieved}
+              </p>
             </div>
           </div>
         </div>
