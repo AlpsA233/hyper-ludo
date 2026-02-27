@@ -91,6 +91,9 @@ export default function App() {
   const [language, setLanguage] = useState<Language>("zh");
   const { t } = useLanguage(language);
 
+  // 检测是否为PC端（屏幕宽度 >= 1024px）
+  const [isPC, setIsPC] = useState(false);
+
   // --- 状态管理 ---
   const [phase, setPhase] = useState<GamePhase>("setup");
   const [numPlayers, setNumPlayers] = useState(4);
@@ -135,6 +138,16 @@ export default function App() {
   const diceRef = useRef<HTMLDivElement>(null);
   const piecesRef = useRef<(HTMLDivElement | null)[]>([]);
   const logsContainerRef = useRef<HTMLDivElement>(null);
+
+  // 检测PC端
+  useEffect(() => {
+    const checkIsPC = () => {
+      setIsPC(window.innerWidth >= 1024);
+    };
+    checkIsPC();
+    window.addEventListener('resize', checkIsPC);
+    return () => window.removeEventListener('resize', checkIsPC);
+  }, []);
 
   // 初始化加载
   useEffect(() => {
@@ -206,13 +219,21 @@ export default function App() {
   const totalSteps = useMemo(() => numPlayers * 10, [numPlayers]);
   const center = { x: 400, y: 400 };
 
+  // 根据PC/移动端设置不同的半径
+  const trackRadius = isPC ? 320 : 240;
+  const decorativeRadius1 = isPC ? 360 : 280;
+  const decorativeRadius2 = isPC ? 410 : 320;
+  const trackWidth = isPC ? 70 : 50;
+  const innerRadius = isPC ? 285 : 210;
+  const innerRadius2 = isPC ? 290 : 215;
+
   const trackCoords = useMemo(() => {
     const coords = [];
     for (let i = 0; i < totalSteps; i++) {
-      coords.push(getPolygonalPos(i, totalSteps, 260, center.x, center.y));
+      coords.push(getPolygonalPos(i, totalSteps, trackRadius, center.x, center.y));
     }
     return coords;
-  }, [totalSteps]);
+  }, [totalSteps, trackRadius]);
 
   // --- 游戏逻辑 ---
   const startGame = () => {
@@ -757,18 +778,53 @@ export default function App() {
         )}
 
         {phase === "playing" && (
-          <div className="w-full h-full flex flex-col items-center justify-center px-4 relative">
-            <div className="absolute top-16 left-0 right-0 z-40">
-              <div className="flex gap-3 overflow-x-auto no-scrollbar py-8 px-4 snap-x snap-mandatory">
-                {players.map((p, i) => {
+          <div className={`w-full h-full flex ${isPC ? 'flex-row' : 'flex-col'} items-center justify-center ${isPC ? 'gap-16 px-8' : 'px-4'} relative`}>
+            {/* 左侧边栏 - 玩家信息 (PC端) / 顶部 (移动端) */}
+            <div className={`${isPC ? 'w-64 h-full flex flex-col gap-4 pt-28 pb-8' : 'absolute top-16 left-0 right-0'} z-40`}>
+              <div className={`flex ${isPC ? 'flex-col' : 'flex-row overflow-x-auto no-scrollbar snap-x snap-mandatory'} gap-3 ${isPC ? '' : 'py-8 px-4'}`}>
+                {(isPC 
+                  ? [...players].sort((a, b) => {
+                      const startIndexA = players.indexOf(a) * (totalSteps / numPlayers);
+                      const startIndexB = players.indexOf(b) * (totalSteps / numPlayers);
+                      const relPosA = a.pos !== -1 ? (a.pos - startIndexA + totalSteps) % totalSteps : 0;
+                      const relPosB = b.pos !== -1 ? (b.pos - startIndexB + totalSteps) % totalSteps : 0;
+                      const progressA = a.lap * totalSteps + relPosA;
+                      const progressB = b.lap * totalSteps + relPosB;
+                      return progressB - progressA;
+                    })
+                  : players
+                ).map((p) => {
+                  const i = players.indexOf(p);
                   const isTurn = i === turn;
-                  const progress =
-                    lapsToWin > 0 ? (p.lap / lapsToWin) * 100 : 0;
+                  // 计算总进度（相对于起始点）
+                  const startIndex = i * (totalSteps / numPlayers);
+                  let relativePos = 0;
+                  if (p.pos !== -1) {
+                    relativePos = (p.pos - startIndex + totalSteps) % totalSteps;
+                  }
+                  const totalProgress = p.lap * totalSteps + relativePos;
+                  const maxProgress = lapsToWin * totalSteps;
+                  const progress = maxProgress > 0 ? (totalProgress / maxProgress) * 100 : 0;
+                  
+                  // 计算排名
+                  const sortedPlayers = [...players].sort((a, b) => {
+                    const indexA = players.indexOf(a);
+                    const indexB = players.indexOf(b);
+                    const startA = indexA * (totalSteps / numPlayers);
+                    const startB = indexB * (totalSteps / numPlayers);
+                    let relPosA = 0, relPosB = 0;
+                    if (a.pos !== -1) relPosA = (a.pos - startA + totalSteps) % totalSteps;
+                    if (b.pos !== -1) relPosB = (b.pos - startB + totalSteps) % totalSteps;
+                    const progressA = a.lap * totalSteps + relPosA;
+                    const progressB = b.lap * totalSteps + relPosB;
+                    return progressB - progressA;
+                  });
+                  const rank = sortedPlayers.indexOf(p) + 1;
 
                   return (
                     <div
                       key={i}
-                      className={`relative p-3 rounded-2xl border transition-all duration-500 flex flex-col items-center min-w-[110px] max-w-[110px] shrink-0 backdrop-blur-xl snap-center
+                      className={`relative p-3 rounded-2xl border transition-all duration-500 flex ${isPC ? 'flex-row' : 'flex-col'} items-center ${isPC ? 'w-full' : 'min-w-[110px] max-w-[110px]'} shrink-0 backdrop-blur-xl ${isPC ? '' : 'snap-center'}
                       ${
                         isTurn
                           ? "bg-white/10 border-white/30 scale-105 shadow-[0_0_20px_rgba(255,255,255,0.1)] z-10"
@@ -783,16 +839,26 @@ export default function App() {
                           : "none",
                       }}>
                       {isTurn && (
-                        <div className="absolute -top-6 left-1/2 -translate-x-1/2">
+                        <div className={`absolute ${isPC ? '-left-3 top-1/2 -translate-y-1/2' : '-top-6 left-1/2 -translate-x-1/2'}`}>
                           <div className="animate-bounce">
                             <div
-                              className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px]"
-                              style={{ borderTopColor: p.color.hex }}></div>
+                              className={`w-0 h-0 ${isPC ? 'border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-l-[8px]' : 'border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px]'}`}
+                              style={isPC ? { borderLeftColor: p.color.hex } : { borderTopColor: p.color.hex }}></div>
                           </div>
                         </div>
                       )}
 
-                      <div className="flex items-center gap-3 mb-2 w-full">
+                      {/* 排名徽章 */}
+                      <div className="absolute -right-2 -top-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-lg z-10"
+                           style={{ 
+                             backgroundColor: rank === 1 ? '#FFD700' : rank === 2 ? '#C0C0C0' : rank === 3 ? '#CD7F32' : '#4a5568',
+                             color: rank <= 3 ? '#000' : '#fff',
+                             border: '2px solid rgba(255,255,255,0.3)'
+                           }}>
+                        {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank}
+                      </div>
+
+                      <div className={`flex items-center gap-3 ${isPC ? '' : 'mb-2'} w-full`}>
                         <div
                           className="w-10 h-10 rounded-full shadow-lg relative overflow-hidden flex items-center justify-center shrink-0 border-2 text-xl"
                           style={{
@@ -815,13 +881,13 @@ export default function App() {
                             {t.player} {i + 1}
                           </div>
                           <div className="text-[10px] text-gray-400 font-mono leading-none">
-                            {p.lap}/{lapsToWin} {t.circle}
+                            {p.lap}/{lapsToWin} {t.circle} · {Math.round(progress)}%
                           </div>
                         </div>
                       </div>
 
                       {/* Progress Bar */}
-                      <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+                      <div className={`${isPC ? 'w-full' : 'w-full'} h-1 bg-white/10 rounded-full overflow-hidden ${isPC ? 'mt-2' : ''}`}>
                         <div
                           className="h-full rounded-full transition-all duration-1000 ease-out relative"
                           style={{
@@ -833,9 +899,11 @@ export default function App() {
                   );
                 })}
               </div>
+
             </div>
 
-            <div className="relative w-full max-w-[min(95vw,450px)] md:max-w-[min(85vw,650px)] lg:max-w-[min(80vh,700px)] aspect-square">
+            {/* 中间 - 棋盘 */}
+            <div className={`relative ${isPC ? 'flex-1 max-w-[min(70vh,750px)]' : 'w-full max-w-[min(95vw,450px)] md:max-w-[min(85vw,650px)]'} aspect-square`}>
               <svg
                 viewBox="0 0 800 800"
                 className="w-full h-full drop-shadow-2xl overflow-visible filter drop-shadow-[0_0_30px_rgba(5,217,232,0.1)]">
@@ -867,7 +935,7 @@ export default function App() {
                 <circle
                   cx="400"
                   cy="400"
-                  r="300"
+                  r={decorativeRadius1}
                   fill="none"
                   stroke="rgba(255,255,255,0.02)"
                   strokeWidth="1"
@@ -877,7 +945,7 @@ export default function App() {
                 <circle
                   cx="400"
                   cy="400"
-                  r="350"
+                  r={decorativeRadius2}
                   fill="none"
                   stroke="rgba(255,255,255,0.01)"
                   strokeWidth="1"
@@ -889,16 +957,16 @@ export default function App() {
                 <circle
                   cx="400"
                   cy="400"
-                  r="260"
+                  r={trackRadius}
                   fill="none"
                   stroke="url(#trackGradient)"
-                  strokeWidth="60"
+                  strokeWidth={trackWidth}
                   className="backdrop-blur-sm"
                 />
                 <circle
                   cx="400"
                   cy="400"
-                  r="230"
+                  r={innerRadius}
                   fill="none"
                   stroke="rgba(255,255,255,0.05)"
                   strokeWidth="1"
@@ -906,7 +974,7 @@ export default function App() {
                 <circle
                   cx="400"
                   cy="400"
-                  r="290"
+                  r={innerRadius2}
                   fill="none"
                   stroke="rgba(255,255,255,0.05)"
                   strokeWidth="1"
@@ -1061,6 +1129,33 @@ export default function App() {
               </div>
             </div>
 
+            {/* 右侧边栏 - 游戏信息 (仅PC端) */}
+            {isPC && (
+              <div className="w-64 h-full flex flex-col gap-4 pt-28 pb-8">
+                {/* 游戏信息 */}
+                <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-4">
+                  <h3 className="text-sm font-bold mb-3 text-cyan-400 flex items-center gap-2">
+                    <Trophy size={16} />
+                    {t.game?.gameInfo || '游戏信息'}
+                  </h3>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">{t.game?.currentRound || '当前回合'}:</span>
+                      <span className="text-white font-mono">{turn + 1} / {numPlayers}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">{t.game?.totalLaps || '目标圈数'}:</span>
+                      <span className="text-white font-mono">{lapsToWin}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">{t.game?.lastDice || '上次掷骰'}:</span>
+                      <span className="text-white font-mono">{diceValue}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {showCardDrawer && (
               <div
                 className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-end animate-fade-in"
@@ -1126,7 +1221,7 @@ export default function App() {
             {showLogs && (
               <div
                 ref={logsContainerRef}
-                className="fixed inset-x-4 bottom-12 sm:bottom-24 z-[60] bg-black/80 backdrop-blur-xl border border-white/10 rounded-2xl p-4 animate-slide-up max-h-[15vh] overflow-y-auto custom-scrollbar">
+                className={`fixed bottom-12 sm:bottom-24 z-[60] bg-black/80 backdrop-blur-xl border border-white/10 rounded-2xl p-4 animate-slide-up max-h-[15vh] overflow-y-auto custom-scrollbar ${isPC ? 'left-8 right-8 max-w-[1400px] mx-auto' : 'inset-x-4'}`}>
                 <div className="space-y-1.5">
                   {logs.map((l, i) => (
                     <div
@@ -1138,6 +1233,7 @@ export default function App() {
                 </div>
               </div>
             )}
+
           </div>
         )}
 
