@@ -8,7 +8,7 @@ interface GamePiecesProps {
   totalSteps: number;
   turn: number;
   isMoving: boolean;
-  cardEffectDisplay: { [key: number]: string };
+  cardEffectDisplay: Record<number, { emoji: string; hideTime: number } | string>;
   piecesRef: React.RefObject<(HTMLDivElement | null)[]>;
 }
 
@@ -74,7 +74,9 @@ export default function GamePieces({
                   fontSize: "20px",
                   pointerEvents: "none",
                 }}>
-                {cardEffectDisplay[i]}
+                {typeof cardEffectDisplay[i] === "string"
+                  ? cardEffectDisplay[i]
+                  : (cardEffectDisplay[i] as any).emoji}
               </div>
             )}
           </div>

@@ -3,7 +3,7 @@ import React from "react";
 interface GameLogProps {
   logs: string[];
   showLogs: boolean;
-  logsContainerRef: React.RefObject<HTMLDivElement>;
+  logsContainerRef: React.RefObject<HTMLDivElement | null>;
   isPC: boolean;
 }
 

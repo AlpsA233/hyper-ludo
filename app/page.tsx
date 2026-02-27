@@ -744,9 +744,6 @@ export default function App() {
             onNumPlayersChange={setNumPlayers}
             onLapsToWinChange={setLapsToWin}
             onEventDensityChange={setEventDensity}
-            onEditCards={() => setPhase("config_cards")}
-            onEditEvents={() => setPhase("config_events")}
-            onOpenSettings={() => setPhase("settings")}
             onManageConfig={() => setPhase("library_manager")}
             onStartGame={startGame}
             t={t}

@@ -1,12 +1,12 @@
 import React from "react";
 import { Trophy, RotateCcw } from "lucide-react";
 import { COLORS } from "@/app/constants";
-import type { Player } from "@/app/types";
+import type { Player, GamePhase } from "@/app/types";
 
 interface WinScreenProps {
   winner: Player | null;
   winnerIndex: number;
-  setPhase: (phase: string) => void;
+  setPhase: (phase: GamePhase) => void;
   t: any;
 }
 

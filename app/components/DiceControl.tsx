@@ -8,17 +8,17 @@ import {
   Dice6,
   CreditCard,
 } from "lucide-react";
-import type { Player } from "@/app/types";
+import type { Player, Card } from "@/app/types";
 
 interface DiceControlProps {
   diceValue: number;
   isRolling: boolean;
   isMoving: boolean;
-  pickingTargetFor: string | null;
+  pickingTargetFor: Card | null;
   hasUsedCard: boolean;
   players: Player[];
   turn: number;
-  diceRef: React.RefObject<HTMLDivElement>;
+  diceRef: React.RefObject<HTMLDivElement | null>;
   handleRollDice: () => void;
   setShowCardDrawer: (show: boolean) => void;
   t: any;

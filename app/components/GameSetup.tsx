@@ -3,9 +3,6 @@
 import React from "react";
 import {
   Target,
-  CreditCard,
-  MessageSquare,
-  Settings,
   Upload,
 } from "lucide-react";
 import type { Translations } from "@/app/locales";
@@ -17,9 +14,6 @@ interface GameSetupProps {
   onNumPlayersChange: (num: number) => void;
   onLapsToWinChange: (laps: number) => void;
   onEventDensityChange: (density: number) => void;
-  onEditCards: () => void;
-  onEditEvents: () => void;
-  onOpenSettings: () => void;
   onManageConfig: () => void;
   onStartGame: () => void;
   t: Translations;
@@ -32,9 +26,6 @@ export default function GameSetup({
   onNumPlayersChange,
   onLapsToWinChange,
   onEventDensityChange,
-  onEditCards,
-  onEditEvents,
-  onOpenSettings,
   onManageConfig,
   onStartGame,
   t,
@@ -105,11 +96,6 @@ export default function GameSetup({
         </div>
 
         <div className="flex flex-col gap-2 pt-2">
-          <button
-            onClick={onOpenSettings}
-            className="w-full py-2 bg-gradient-to-r from-pink-500/10 to-purple-500/10 border border-pink-500/20 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:from-pink-500/20 hover:to-purple-500/20 transition-all shadow-lg active:scale-95">
-            <Settings size={14} /> {t.setup.gameSettings}
-          </button>
           <button
             onClick={onManageConfig}
             className="w-full py-2 bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:from-orange-500/20 hover:to-red-500/20 transition-all shadow-lg active:scale-95">
