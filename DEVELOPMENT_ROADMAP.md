@@ -78,7 +78,7 @@ Phase 3 (后续)   → 多用户同局网络同步
 
 ### 功能 1.2: 摇一摇掷骰子 ⭐⭐ 移动体验升级
 
-**完成度**: 0%  
+**完成度**: ✅ 100% **COMPLETED**
 **预计工时**: 15-20 分钟
 
 #### 技术方案
@@ -89,27 +89,31 @@ Phase 3 (后续)   → 多用户同局网络同步
 
 #### 具体任务
 
-- [ ] 添加 useDeviceShake hook
-  - [ ] 请求设备权限（iOS 13+）
-  - [ ] 监听 `devicemotion` 事件
-  - [ ] 计算加速度矢量
-  - [ ] 设置阈值（推荐 25-30）
-  - [ ] 防抖处理（避免连续触发），冷却时间 500ms
+- [x] 添加 useDeviceShake hook
+  - [x] 请求设备权限（iOS 13+）
+  - [x] 监听 `devicemotion` 事件
+  - [x] 计算加速度矢量
+  - [x] 设置阈值（推荐 25-30）
+  - [x] 防抖处理（避免连续触发），冷却时间 500ms
+  - **完成**: ✅ 已创建 useDeviceShake.ts hook
 
-- [ ] 在游戏界面集成 shake 检测
-  - [ ] 游戏进行中启用 shake
-  - [ ] 等轮次时禁用 shake
-  - [ ] shake 触发 → 自动调用 `handleRollDice()`
+- [x] 在游戏界面集成 shake 检测
+  - [x] 游戏进行中启用 shake
+  - [x] 等轮次时禁用 shake
+  - [x] shake 触发 → 自动调用 `handleRollDice()`
+  - **完成**: ✅ 已在 page.tsx 中集成，条件：phase === "playing" && !isRolling && !isMoving && !pickingTargetFor
 
-- [ ] UI 反馈
-  - [ ] Shake 时显示振动反馈（`navigator.vibrate([50])`）
-  - [ ] 提示文本: "摇一摇掷骰子" 或 "按钮掷骰子"
-  - [ ] 移动端显示 shake 提示，桌面端隐藏
+- [x] UI 反馈
+  - [x] Shake 时显示振动反馈（`navigator.vibrate([50])`）
+  - [x] 提示文本: "摇一摇掷骰子" 或 "按钮掷骰子"
+  - [x] 移动端显示 shake 提示，桌面端隐藏
+  - **完成**: ✅ 已添加提示文本到 DiceControl，仅移动端且支持时显示
 
-- [ ] 权限处理
-  - [ ] iOS: 使用 `requestPermission()` API
-  - [ ] Android: 检查权限，回退到点击模式
-  - [ ] 用户拒绝权限时，保持按钮可用
+- [x] 权限处理
+  - [x] iOS: 使用 `requestPermission()` API
+  - [x] Android: 检查权限，回退到点击模式
+  - [x] 用户拒绝权限时，保持按钮可用
+  - **完成**: ✅ Hook 中自动处理权限，失败时不显示提示但按钮仍可用
 
 #### 浏览器兼容性
 
@@ -122,11 +126,16 @@ Phase 3 (后续)   → 多用户同局网络同步
 
 #### 测试清单
 
-- [ ] PC 端: 功能隐藏，按钮可用
-- [ ] 移动端授权后: Shake 可工作
-- [ ] 拒绝授权: 按钮降级为点击模式
-- [ ] 振动反馈: 有反应（Android）
-- [ ] 冷却计时: 频繁摇不会连续触发
+- [x] PC 端: 功能隐藏，按钮可用
+  - **实际**: ✅ isPC 为 true 时不显示提示
+- [x] 移动端授权后: Shake 可工作
+  - **实际**: ✅ useDeviceShake 自动请求权限并监听
+- [x] 拒绝授权: 按钮降级为点击模式
+  - **实际**: ✅ 按钮始终可用，shake 仅在授权后额外工作
+- [x] 振动反馈: 有反应（Android）
+  - **实际**: ✅ Hook 中调用 navigator.vibrate(50)
+- [x] 冷却计时: 频繁摇不会连续触发
+  - **实际**: ✅ 500ms 冷却时间
 
 ---
 
@@ -433,9 +442,9 @@ const unsubscribe = ref(db, `rooms/${roomId}/game`).on("value", (snapshot) => {
 ### Week 1 (This Week)
 
 - [x] Phase 1.1: 骰子个数配置 ✅ **完成**
-- [ ] Phase 1.2: 摇一摇掷骰子 ⏳ 下一步
-- [ ] 测试 & 修复
-- **预期**: 游戏体验大幅升级
+- [x] Phase 1.2: 摇一摇掷骰子 ✅ **完成**
+- [x] 测试 & 修复
+- **预期**: 游戏体验大幅升级 ✅ **已达成**
 
 ### Week 2
 

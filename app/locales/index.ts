@@ -137,6 +137,7 @@ export interface Translations {
   game: {
     abort: string;
     total: string;
+    shakeToRoll: string;
     abortMessage: string;
     taskComplete: string;
     cardUsed: string;
@@ -297,6 +298,7 @@ const zh: Translations = {
   game: {
     abort: "Abort Mission?",
     total: "Total",
+    shakeToRoll: "摇一摇掷骰子",
     abortMessage: "确定要退出游戏吗?",
     taskComplete: "任务已完成",
     cardUsed: "{name} 使用了 [{card}]",
@@ -456,6 +458,7 @@ const en: Translations = {
   game: {
     abort: "Abort Mission?",
     total: "Total",
+    shakeToRoll: "Shake to Roll",
     abortMessage: "Are you sure you want to quit the game?",
     taskComplete: "Task Completed",
     cardUsed: "{name} used [{card}]",
@@ -615,6 +618,7 @@ const ja: Translations = {
   game: {
     abort: "ミッションを中止しますか?",
     total: "合計",
+    shakeToRoll: "シェイクしてサイコロを振る",
     abortMessage: "ゲームを終了してもよろしいですか?",
     taskComplete: "タスク完了",
     cardUsed: "{name}は[{card}]を使用しました",
@@ -776,6 +780,7 @@ const fr: Translations = {
   game: {
     abort: "Abandonner la mission?",
     total: "Total",
+    shakeToRoll: "Secouez pour lancer les dés",
     abortMessage: "Êtes-vous sûr de vouloir quitter le jeu?",
     taskComplete: "Tâche terminée",
     cardUsed: "{name} a utilisé [{card}]",

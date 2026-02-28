@@ -25,6 +25,7 @@ interface DiceControlProps {
   setShowCardDrawer: (show: boolean) => void;
   t: any;
   isPC: boolean;
+  isShakeSupported?: boolean;
 }
 
 export default function DiceControl({
@@ -42,6 +43,7 @@ export default function DiceControl({
   setShowCardDrawer,
   t,
   isPC,
+  isShakeSupported = false,
 }: DiceControlProps) {
   // 生成单个骰子面的函数
   const renderDiceFaces = () => {
@@ -108,6 +110,21 @@ export default function DiceControl({
             </div>
           ))}
         </div>
+
+        {/* 提示文字 */}
+        {!isRolling && !isMoving && (
+          <div className="text-center">
+            {!isPC && isShakeSupported ? (
+              <p className="text-xs text-gray-400 animate-pulse">
+                {t.shakeToRoll || "摇一摇掷骰子"}
+              </p>
+            ) : isPC ? (
+              <p className="text-xs text-gray-400">
+                点击骰子或按 <kbd className="px-2 py-1 bg-white/10 rounded border border-white/20 font-mono text-xs">Space</kbd> 掷骰子
+              </p>
+            ) : null}
+          </div>
+        )}
 
         {!isRolling && !isMoving && !pickingTargetFor && (
           <button

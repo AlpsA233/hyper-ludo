@@ -5,6 +5,7 @@ import { Globe } from "lucide-react";
 import type { Language } from "@/app/locales";
 import { getTranslation } from "@/app/locales";
 import { useLanguage } from "@/app/hooks/useLanguage";
+import { useDeviceShake } from "@/app/hooks/useDeviceShake";
 import {
   Dice1,
   Dice2,
@@ -155,6 +156,18 @@ export default function App() {
   const piecesRef = useRef<(HTMLDivElement | null)[]>([]);
   const logsContainerRef = useRef<HTMLDivElement>(null);
 
+  // 摇一摇掷骰子
+  const { isSupported: isShakeSupported, isPermissionGranted: isShakePermissionGranted } = useDeviceShake({
+    threshold: 25,
+    cooldown: 500,
+    onShake: () => {
+      // 只有在游戏进行中、不是滚动中、不是移动中、不是选择目标时才能摇一摇
+      if (phase === "playing" && !isRolling && !isMoving && !pickingTargetFor) {
+        handleRollDice();
+      }
+    },
+  });
+
   // 检测PC端
   useEffect(() => {
     const checkIsPC = () => {
@@ -164,6 +177,27 @@ export default function App() {
     window.addEventListener("resize", checkIsPC);
     return () => window.removeEventListener("resize", checkIsPC);
   }, []);
+
+  // 开发者快捷键：PC端按空格键模拟摇一摇掷骰子
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // 只在游戏进行中且按下空格键时触发
+      if (
+        e.code === "Space" &&
+        phase === "playing" &&
+        !isRolling &&
+        !isMoving &&
+        !pickingTargetFor &&
+        !e.repeat // 防止长按连续触发
+      ) {
+        e.preventDefault();
+        handleRollDice();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyPress);
+    return () => window.removeEventListener("keydown", handleKeyPress);
+  }, [phase, isRolling, isMoving, pickingTargetFor]);
 
   // 点击外部关闭语言菜单
   useEffect(() => {
@@ -987,6 +1021,7 @@ export default function App() {
                 setShowCardDrawer={setShowCardDrawer}
                 t={t.game}
                 isPC={isPC}
+                isShakeSupported={isShakeSupported && isShakePermissionGranted}
               />
             </div>
 
