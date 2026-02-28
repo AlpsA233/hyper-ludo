@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Globe } from "lucide-react";
+import { Globe, LogOut } from "lucide-react";
 import type { Language } from "@/app/locales";
 import { getTranslation } from "@/app/locales";
 import { useLanguage } from "@/app/hooks/useLanguage";
 import { useDeviceShake } from "@/app/hooks/useDeviceShake";
+import { useAuth } from "@/app/hooks/useAuth";
 import {
   Dice1,
   Dice2,
@@ -23,6 +24,7 @@ import {
   Target,
   MessageSquare,
 } from "lucide-react";
+import AuthScreen from "@/app/components/AuthScreen";
 import GameSetup from "@/app/components/GameSetup";
 import CardEditor from "@/app/components/CardEditor";
 import EventEditor from "@/app/components/EventEditor";
@@ -102,11 +104,24 @@ export default function App() {
   const { t } = useLanguage(language);
   const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
 
+  // 认证系统
+  const {
+    user,
+    loading: authLoading,
+    error: authError,
+    signInWithGoogle,
+    signInWithGithub,
+    signOut,
+    continueAsGuest,
+  } = useAuth();
+
+  const [guestMode, setGuestMode] = useState(false);
+
   // 检测是否为PC端（屏幕宽度 >= 1024px）
   const [isPC, setIsPC] = useState(false);
 
   // --- 状态管理 ---
-  const [phase, setPhase] = useState<GamePhase>("setup");
+  const [phase, setPhase] = useState<GamePhase>("auth");
   const [numPlayers, setNumPlayers] = useState(4);
   const [diceCount, setDiceCount] = useState(1);
   const [lapsToWin, setLapsToWin] = useState(3);
@@ -187,6 +202,23 @@ export default function App() {
     window.addEventListener("resize", checkIsPC);
     return () => window.removeEventListener("resize", checkIsPC);
   }, []);
+
+  // 检测认证状态，决定是否进入游戏
+  useEffect(() => {
+    if (!authLoading) {
+      if (user || guestMode) {
+        // 已登录或游客模式，进入游戏设置页面
+        if (phase === "auth") {
+          setPhase("setup");
+        }
+      } else {
+        // 未登录且未选择游客模式，显示登录页
+        if (phase !== "auth") {
+          setPhase("auth");
+        }
+      }
+    }
+  }, [user, guestMode, authLoading, phase]);
 
   // 开发者快捷键：PC端按空格键模拟摇一摇掷骰子
   useEffect(() => {
@@ -840,10 +872,49 @@ export default function App() {
               ))}
             </div>
           </div>
+
+          {/* 用户信息和登出按钮 */}
+          {(user || guestMode) && phase !== "auth" && (
+            <div className="flex items-center gap-2">
+              {user && (
+                <div className="text-xs text-gray-400 hidden sm:block max-w-[120px] truncate">
+                  {user.user_metadata?.name ||
+                    user.user_metadata?.full_name ||
+                    user.email}
+                </div>
+              )}
+              <button
+                onClick={async () => {
+                  if (user) {
+                    await signOut();
+                  }
+                  setGuestMode(false);
+                  setPhase("auth");
+                }}
+                className="w-9 h-9 bg-white/10 rounded-lg flex items-center justify-center border border-white/10 hover:bg-red-500/20 hover:border-red-500/30 transition-colors"
+                title={t.auth.signOut}>
+                <LogOut size={16} />
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
       <main className="relative z-10 w-full h-full flex flex-col items-center justify-center pt-[100px] sm:pt-20">
+        {phase === "auth" && (
+          <div className="absolute inset-0 overflow-y-auto">
+            <AuthScreen
+              onGoogleSignIn={signInWithGoogle}
+              onGithubSignIn={signInWithGithub}
+              onContinueAsGuest={() => {
+                setGuestMode(true);
+              }}
+              error={authError}
+              t={t}
+            />
+          </div>
+        )}
+
         {phase === "setup" && (
           <GameSetup
             numPlayers={numPlayers}

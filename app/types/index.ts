@@ -1,5 +1,6 @@
 // 游戏阶段类型
 export type GamePhase =
+  | "auth"
   | "setup"
   | "settings"
   | "playing"

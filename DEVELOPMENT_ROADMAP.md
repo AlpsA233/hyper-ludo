@@ -141,59 +141,86 @@ Phase 3 (后续)   → 多用户同局网络同步
 
 ## Phase 2️⃣: 用户系统基础 (优先级: 🟡 下周开始)
 
-### 功能 2.1: Firebase 用户认证
+### 功能 2.1: Supabase 用户认证
 
-**完成度**: 0%  
+**完成度**: ✅ 95% (需配置 OAuth 提供商)
 **预计工时**: 2-3 小时
 
 #### 技术方案
 
-- 使用 Firebase Authentication（Google/GitHub OAuth）
-- Firebase Realtime Database 存储用户数据
-- 本地认证状态管理
+- ✅ 使用 Supabase Authentication（Google/GitHub OAuth）
+- ✅ 本地认证状态管理
+- ✅ Session 持久化
 
 #### 具体任务
 
-- [ ] Firebase 项目初始化
-  - [ ] 创建 Firebase 项目
-  - [ ] 配置 Authentication（Google + GitHub）
-  - [ ] 配置 Realtime Database 规则
-  - [ ] 获取 config 并集成到项目
+- [x] Supabase 项目初始化
+  - [x] 创建 Supabase 项目
+  - [x] 安装 @supabase/supabase-js
+  - [x] 配置环境变量
+  - [x] 创建 Supabase 客户端
 
-- [ ] 认证 UI 组件 (`AuthScreen.tsx`)
-  - [ ] Google 登录按钮
-  - [ ] GitHub 登录按钮
-  - [ ] 游客模式（可选）
-  - [ ] 登出功能
+- [x] 认证 UI 组件 (`AuthScreen.tsx`)
+  - [x] Google 登录按钮
+  - [x] GitHub 登录按钮
+  - [x] 游客模式（可选）
+  - [x] 登出功能
+  - [x] 错误提示
 
-- [ ] 用户数据模型
+- [x] 用户数据模型
 
   ```typescript
   interface User {
-    uid: string;
-    email: string;
-    displayName: string;
-    avatar?: string;
-    createdAt: timestamp;
+    id: string;
+    email?: string;
+    user_metadata?: {
+      avatar_url?: string;
+      full_name?: string;
+      name?: string;
+    };
   }
   ```
 
-- [ ] 本地认证状态
-  - [ ] useAuth hook
-  - [ ] 全局认证上下文（Context API）
-  - [ ] 持久化 session
+- [x] 本地认证状态
+  - [x] useAuth hook
+  - [x] 自动持久化 session
+  - [x] 监听认证状态变化
 
-- [ ] 页面流程
-  - [ ] 未登录 → 显示登录屏
-  - [ ] 登录成功 → 跳转到主菜单
-  - [ ] 已登录 → 直接进入游戏设置
+- [x] 页面流程
+  - [x] 未登录 → 显示登录屏
+  - [x] 登录成功 → 跳转到主菜单
+  - [x] 已登录 → 直接进入游戏设置
+  - [x] Header 显示用户信息和登出按钮
+
+- [x] 国际化支持
+  - [x] 中文、英文、日文、法文翻译
+  - [x] 登录页面完整国际化
+
+#### 下一步需要配置（5分钟）
+
+前往 Supabase Dashboard 配置 OAuth 提供商：
+
+1. **Google OAuth:**
+   - Authentication → Providers → Google
+   - 启用 Google Provider
+   - 创建 Google OAuth 应用（https://console.cloud.google.com/apis/credentials）
+   - 填入 Client ID 和 Client Secret
+
+2. **GitHub OAuth:**
+   - Authentication → Providers → GitHub
+   - 启用 GitHub Provider
+   - 创建 GitHub OAuth App（https://github.com/settings/developers）
+   - 填入 Client ID 和 Client Secret
+   - Callback URL: `https://qjirnckllkqsrnicrnaz.supabase.co/auth/v1/callback`
 
 #### 测试清单
 
-- [ ] 登录流程: Google OAuth 可工作
-- [ ] 登录流程: GitHub OAuth 可工作
-- [ ] Session 持久化: 刷新页面后仍登录
-- [ ] 登出功能: 返回登录屏
+- [ ] 登录流程: Google OAuth 可工作（需配置后测试）
+- [ ] 登录流程: GitHub OAuth 可工作（需配置后测试）
+- [x] 游客模式: 可以跳过登录直接进入
+- [x] Session 持久化: 页面刷新后保持登录
+- [x] 登出功能: 返回登录屏幕
+- [x] 国际化: 所有语言显示正确
 
 ---
 

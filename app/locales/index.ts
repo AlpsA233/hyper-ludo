@@ -11,6 +11,18 @@ export interface Translations {
     confirm: string;
   };
 
+  // Auth
+  auth: {
+    welcome: string;
+    signIn: string;
+    signInWithGoogle: string;
+    signInWithGithub: string;
+    continueAsGuest: string;
+    or: string;
+    disclaimer: string;
+    signOut: string;
+  };
+
   // Game Setup
   setup: {
     title: string;
@@ -183,6 +195,16 @@ const zh: Translations = {
     close: "关闭",
     confirm: "确认",
   },
+  auth: {
+    welcome: "欢迎来到星际派对！",
+    signIn: "登录账号",
+    signInWithGoogle: "使用 Google 登录",
+    signInWithGithub: "使用 GitHub 登录",
+    continueAsGuest: "游客模式继续",
+    or: "或",
+    disclaimer: "登录即表示您同意我们的服务条款和隐私政策",
+    signOut: "退出登录",
+  },
   setup: {
     title: "星际派对配置",
     diceCount: "骰子个数",
@@ -341,6 +363,17 @@ const en: Translations = {
     add: "Add",
     close: "Close",
     confirm: "Confirm",
+  },
+  auth: {
+    welcome: "Welcome to Space Party!",
+    signIn: "Sign In",
+    signInWithGoogle: "Sign in with Google",
+    signInWithGithub: "Sign in with GitHub",
+    continueAsGuest: "Continue as Guest",
+    or: "or",
+    disclaimer:
+      "By signing in, you agree to our Terms of Service and Privacy Policy",
+    signOut: "Sign Out",
   },
   setup: {
     title: "Space Party Config",
@@ -502,6 +535,17 @@ const ja: Translations = {
     close: "閉じる",
     confirm: "確認",
   },
+  auth: {
+    welcome: "スペースパーティへようこそ！",
+    signIn: "サインイン",
+    signInWithGoogle: "Googleでサインイン",
+    signInWithGithub: "GitHubでサインイン",
+    continueAsGuest: "ゲストとして続ける",
+    or: "または",
+    disclaimer:
+      "サインインすることで、利用規約とプライバシーポリシーに同意したことになります",
+    signOut: "サインアウト",
+  },
   setup: {
     title: "スペースパーティ設定",
     diceCount: "サイコロの数",
@@ -662,6 +706,17 @@ const fr: Translations = {
     add: "Ajouter",
     close: "Fermer",
     confirm: "Confirmer",
+  },
+  auth: {
+    welcome: "Bienvenue au Space Party !",
+    signIn: "Se connecter",
+    signInWithGoogle: "Se connecter avec Google",
+    signInWithGithub: "Se connecter avec GitHub",
+    continueAsGuest: "Continuer en tant qu'invité",
+    or: "ou",
+    disclaimer:
+      "En vous connectant, vous acceptez nos conditions d'utilisation",
+    signOut: "Se déconnecter",
   },
   setup: {
     title: "Configuration du Party Spatial",
