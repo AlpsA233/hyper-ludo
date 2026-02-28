@@ -109,29 +109,6 @@ export default function DiceControl({
           ))}
         </div>
 
-        {/* 显示掷骰结果 */}
-        {!isRolling && diceResults.length > 0 && (
-          <div className="text-center">
-            {diceResults.length > 1 ? (
-              <>
-                <div
-                  className={`text-gray-400 mb-1 ${isPC ? "text-xs" : "text-[10px]"}`}>
-                  {diceResults.join(" + ")}
-                </div>
-                <div
-                  className={`font-bold text-cyan-400 ${isPC ? "text-lg" : "text-sm"}`}>
-                  {t.game?.total || "总计"}: {diceValue}
-                </div>
-              </>
-            ) : (
-              <div
-                className={`font-bold text-cyan-400 ${isPC ? "text-lg" : "text-base"}`}>
-                {diceValue}
-              </div>
-            )}
-          </div>
-        )}
-
         {!isRolling && !isMoving && !pickingTargetFor && (
           <button
             onClick={() => setShowCardDrawer(true)}
