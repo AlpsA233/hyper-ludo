@@ -88,7 +88,10 @@ export default function GameSetup({
               ? t.setup.onlyCustomTiles
               : eventDensity === 100
                 ? t.setup.eventDensityHigh
-                : t.setup.eventDensityPercent.replace("{percent}", String(eventDensity))}
+                : t.setup.eventDensityPercent.replace(
+                    "{percent}",
+                    String(eventDensity),
+                  )}
           </p>
         </div>
 

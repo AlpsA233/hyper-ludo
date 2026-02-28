@@ -167,7 +167,7 @@ export default function App() {
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (!target.closest('[data-language-menu]')) {
+      if (!target.closest("[data-language-menu]")) {
         setIsLanguageMenuOpen(false);
       }
     };
@@ -248,12 +248,12 @@ export default function App() {
   const center = { x: 400, y: 400 };
 
   // 根据PC/移动端设置不同的半径
-  const trackRadius = isPC ? 320 : 240;
-  const decorativeRadius1 = isPC ? 360 : 280;
-  const decorativeRadius2 = isPC ? 410 : 320;
-  const trackWidth = isPC ? 70 : 50;
-  const innerRadius = isPC ? 285 : 210;
-  const innerRadius2 = isPC ? 290 : 215;
+  const trackRadius = isPC ? 320 : 310;
+  const decorativeRadius1 = isPC ? 360 : 350;
+  const decorativeRadius2 = isPC ? 410 : 390;
+  const trackWidth = isPC ? 70 : 60;
+  const innerRadius = isPC ? 285 : 275;
+  const innerRadius2 = isPC ? 290 : 280;
 
   const trackCoords = useMemo(() => {
     const coords = [];
@@ -263,7 +263,7 @@ export default function App() {
       );
     }
     return coords;
-  }, [totalSteps, trackRadius]);
+  }, [totalSteps, trackRadius, center.x, center.y]);
 
   // --- 游戏逻辑 ---
   const startGame = () => {
@@ -725,14 +725,17 @@ export default function App() {
             </button>
           )}
           <div className="relative" data-language-menu>
-            <button 
+            <button
               onClick={() => setIsLanguageMenuOpen(!isLanguageMenuOpen)}
               className="w-9 h-9 bg-white/10 rounded-lg flex items-center justify-center border border-white/10 hover:bg-white/20 transition-colors">
               <Globe size={16} />
             </button>
-            <div className={`absolute right-0 mt-2 w-32 bg-black/90 border border-white/10 rounded-lg shadow-xl transition-all duration-200 z-50 ${
-              isLanguageMenuOpen ? "opacity-100 visible" : "opacity-0 invisible"
-            }`}>
+            <div
+              className={`absolute right-0 mt-2 w-32 bg-black/90 border border-white/10 rounded-lg shadow-xl transition-all duration-200 z-50 ${
+                isLanguageMenuOpen
+                  ? "opacity-100 visible"
+                  : "opacity-0 invisible"
+              }`}>
               {(["zh", "en", "ja", "fr"] as const).map((lang) => (
                 <button
                   key={lang}
@@ -757,7 +760,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="relative z-10 w-full h-full flex flex-col items-center justify-center">
+      <main className="relative z-10 w-full h-full flex flex-col items-center justify-center pt-22">
         {phase === "setup" && (
           <GameSetup
             numPlayers={numPlayers}
@@ -874,7 +877,7 @@ export default function App() {
 
         {phase === "playing" && (
           <div
-            className={`w-full h-full flex ${isPC ? "flex-row" : "flex-col"} ${isPC ? "items-start justify-center" : "items-center justify-center"} ${isPC ? "gap-16 px-8 pt-20" : "px-4"} relative`}>
+            className={`w-full h-full flex ${isPC ? "flex-row" : "flex-col"} ${isPC ? "items-start justify-center" : "items-center justify-start"} ${isPC ? "gap-16 px-8 pt-20" : "px-4"} relative overflow-y-auto`}>
             {/* Player Sidebar */}
             {isPC ? (
               <PlayerSidebar
@@ -886,7 +889,7 @@ export default function App() {
                 t={t.game}
               />
             ) : (
-              <div className="absolute top-16 left-0 right-0 z-40">
+              <div className="w-full max-h-[20vh] flex-shrink-0 overflow-x-auto">
                 <PlayerSidebar
                   players={players}
                   turn={turn}
@@ -900,7 +903,7 @@ export default function App() {
 
             {/* Game Board */}
             <div
-              className={`relative ${isPC ? "flex-1 max-w-[min(70vh,750px)] mt-32" : "w-full max-w-[min(95vw,450px)] md:max-w-[min(85vw,650px)]"} aspect-square`}>
+              className={`relative flex-shrink-0 ${isPC ? "flex-1 max-w-[min(70vh,750px)] mt-8" : "w-full max-w-[98vw] md:max-w-[min(90vw,720px)]"} aspect-square`}>
               <GameBoard
                 trackCoords={trackCoords}
                 boardTiles={boardTiles}

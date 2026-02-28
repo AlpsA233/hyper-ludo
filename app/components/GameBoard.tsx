@@ -34,7 +34,7 @@ export default function GameBoard({
 }: GameBoardProps) {
   return (
     <div
-      className={`relative ${isPC ? "flex-1 max-w-[min(70vh,750px)]" : "w-full max-w-[min(95vw,450px)] md:max-w-[min(85vw,650px)]"} aspect-square`}>
+      className={`relative ${isPC ? "flex-1 max-w-[min(70vh,750px)]" : "w-full"} aspect-square`}>
       <svg
         viewBox="0 0 800 800"
         className="w-full h-full drop-shadow-2xl overflow-visible filter drop-shadow-[0_0_30px_rgba(5,217,232,0.1)]">
