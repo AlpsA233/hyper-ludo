@@ -99,6 +99,7 @@ const getPolygonalPos = (
 export default function App() {
   const [language, setLanguage] = useState<Language>("zh");
   const { t } = useLanguage(language);
+  const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
 
   // 检测是否为PC端（屏幕宽度 >= 1024px）
   const [isPC, setIsPC] = useState(false);
@@ -161,6 +162,20 @@ export default function App() {
     window.addEventListener("resize", checkIsPC);
     return () => window.removeEventListener("resize", checkIsPC);
   }, []);
+
+  // 点击外部关闭语言菜单
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-language-menu]')) {
+        setIsLanguageMenuOpen(false);
+      }
+    };
+    if (isLanguageMenuOpen) {
+      document.addEventListener("click", handleClickOutside);
+      return () => document.removeEventListener("click", handleClickOutside);
+    }
+  }, [isLanguageMenuOpen]);
 
   // 初始化加载
   useEffect(() => {
@@ -709,15 +724,22 @@ export default function App() {
               <ScrollText size={16} />
             </button>
           )}
-          <div className="relative group">
-            <button className="w-9 h-9 bg-white/10 rounded-lg flex items-center justify-center border border-white/10 hover:bg-white/20 transition-colors">
+          <div className="relative" data-language-menu>
+            <button 
+              onClick={() => setIsLanguageMenuOpen(!isLanguageMenuOpen)}
+              className="w-9 h-9 bg-white/10 rounded-lg flex items-center justify-center border border-white/10 hover:bg-white/20 transition-colors">
               <Globe size={16} />
             </button>
-            <div className="absolute right-0 mt-2 w-32 bg-black/90 border border-white/10 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+            <div className={`absolute right-0 mt-2 w-32 bg-black/90 border border-white/10 rounded-lg shadow-xl transition-all duration-200 z-50 ${
+              isLanguageMenuOpen ? "opacity-100 visible" : "opacity-0 invisible"
+            }`}>
               {(["zh", "en", "ja", "fr"] as const).map((lang) => (
                 <button
                   key={lang}
-                  onClick={() => setLanguage(lang)}
+                  onClick={() => {
+                    setLanguage(lang);
+                    setIsLanguageMenuOpen(false);
+                  }}
                   className={`w-full px-4 py-2 text-left text-sm hover:bg-white/10 transition-colors ${
                     language === lang ? "bg-white/20 text-cyan-400" : ""
                   }`}>
@@ -755,27 +777,27 @@ export default function App() {
           <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="bg-black/80 border border-white/10 rounded-3xl p-8 max-w-sm w-full space-y-4 animate-fade-in">
               <h3 className="text-xl font-bold text-white mb-6 text-center">
-                库管理
+                {t.setup.libraryManager}
               </h3>
               <button
                 onClick={() => setPhase("config_cards")}
                 className="w-full py-3 px-4 bg-cyan-500/10 border border-cyan-500/20 rounded-xl text-sm font-bold hover:bg-cyan-500/20 transition-all">
-                📚 编辑卡牌库
+                {t.setup.editCards}
               </button>
               <button
                 onClick={() => setPhase("config_events")}
                 className="w-full py-3 px-4 bg-purple-500/10 border border-purple-500/20 rounded-xl text-sm font-bold hover:bg-purple-500/20 transition-all">
-                ⚡ 编辑事件库
+                {t.setup.editEvents}
               </button>
               <button
                 onClick={() => setPhase("config_manager")}
                 className="w-full py-3 px-4 bg-orange-500/10 border border-orange-500/20 rounded-xl text-sm font-bold hover:bg-orange-500/20 transition-all">
-                ⚙️ 配置导入导出
+                {t.setup.configImportExport}
               </button>
               <button
                 onClick={() => setPhase("setup")}
                 className="w-full py-3 px-4 bg-white/5 border border-white/10 rounded-xl text-sm font-bold hover:bg-white/10 transition-all mt-4">
-                返回
+                {t.setup.backButton}
               </button>
             </div>
           </div>

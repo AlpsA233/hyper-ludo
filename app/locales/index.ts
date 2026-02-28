@@ -22,6 +22,12 @@ export interface Translations {
     onlyCustomTiles: string;
     manageLibraries: string;
     startGame: string;
+    libraryManager: string;
+    editCards: string;
+    editEvents: string;
+    configImportExport: string;
+    backButton: string;
+    eventDensityPercent: string;
   };
 
   // Game Settings
@@ -150,6 +156,10 @@ export interface Translations {
     targetSelfEmoji: string;
     targetAllPlayersEmoji: string;
     targetRandomOtherEmoji: string;
+    gameInfo: string;
+    currentRound: string;
+    totalLaps: string;
+    lastDice: string;
   };
 
   // Player names
@@ -177,6 +187,12 @@ const zh: Translations = {
     onlyCustomTiles: "仅在部分格子触发事件",
     manageLibraries: "库管理",
     startGame: "启动任务",
+    libraryManager: "库管理",
+    editCards: "📚 编辑卡牌库",
+    editEvents: "⚡ 编辑事件库",
+    configImportExport: "⚙️ 配置导入导出",
+    backButton: "返回",
+    eventDensityPercent: "{percent}% 概率在每步触发事件",
   },
   settings: {
     title: "游戏设置",
@@ -295,6 +311,10 @@ const zh: Translations = {
     targetSelfEmoji: "👤 自己",
     targetAllPlayersEmoji: "🌟 所有玩家",
     targetRandomOtherEmoji: "🎲 随机对手",
+    gameInfo: "游戏信息",
+    currentRound: "当前回合",
+    totalLaps: "目标圈数",
+    lastDice: "上次掷骰",
   },
   player: "玩家",
   circle: "圈",
@@ -320,6 +340,12 @@ const en: Translations = {
     onlyCustomTiles: "Only on Some Tiles",
     manageLibraries: "Manage Libraries",
     startGame: "Start Game",
+    libraryManager: "Library Manager",
+    editCards: "📚 Edit Cards",
+    editEvents: "⚡ Edit Events",
+    configImportExport: "⚙️ Config Import/Export",
+    backButton: "Back",
+    eventDensityPercent: "{percent}% Event Chance Per Step",
   },
   settings: {
     title: "Game Settings",
@@ -439,6 +465,10 @@ const en: Translations = {
     targetSelfEmoji: "👤 Self",
     targetAllPlayersEmoji: "🌟 All Players",
     targetRandomOtherEmoji: "🎲 Random Opponent",
+    gameInfo: "Game Info",
+    currentRound: "Current Turn",
+    totalLaps: "Target Laps",
+    lastDice: "Last Roll",
   },
   player: "Player",
   circle: "Circle",
@@ -464,6 +494,12 @@ const ja: Translations = {
     onlyCustomTiles: "一部のタイルのみ",
     manageLibraries: "ライブラリ管理",
     startGame: "ゲーム開始",
+    libraryManager: "ライブラリマネージャー",
+    editCards: "📚 カードを編集",
+    editEvents: "⚡ イベントを編集",
+    configImportExport: "⚙️ 設定のインポート/エクスポート",
+    backButton: "戻る",
+    eventDensityPercent: "{percent}% の確率で各ステップでイベントが発動",
   },
   settings: {
     title: "ゲーム設定",
@@ -584,6 +620,10 @@ const ja: Translations = {
     targetSelfEmoji: "👤 自分",
     targetAllPlayersEmoji: "🌟 全プレイヤー",
     targetRandomOtherEmoji: "🎲 ランダム相手",
+    gameInfo: "ゲーム情報",
+    currentRound: "現在のターン",
+    totalLaps: "目標ラップ",
+    lastDice: "最後のロール",
   },
   player: "プレイヤー",
   circle: "ラップ",
@@ -609,6 +649,12 @@ const fr: Translations = {
     onlyCustomTiles: "Seulement sur certaines cases",
     manageLibraries: "Gérer les bibliothèques",
     startGame: "Commencer le jeu",
+    libraryManager: "Gestionnaire de bibliothèque",
+    editCards: "📚 Modifier les cartes",
+    editEvents: "⚡ Modifier les événements",
+    configImportExport: "⚙️ Import/Export de configuration",
+    backButton: "Retour",
+    eventDensityPercent: "{percent}% de chance d'événement à chaque étape",
   },
   settings: {
     title: "Paramètres du jeu",
@@ -730,6 +776,10 @@ const fr: Translations = {
     targetSelfEmoji: "👤 Soi-même",
     targetAllPlayersEmoji: "🌟 Tous les joueurs",
     targetRandomOtherEmoji: "🎲 Adversaire aléatoire",
+    gameInfo: "Informations du jeu",
+    currentRound: "Tour actuel",
+    totalLaps: "Tours cibles",
+    lastDice: "Dernier lancer",
   },
   player: "Joueur",
   circle: "Tour",
