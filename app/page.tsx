@@ -156,14 +156,20 @@ export default function App() {
   const piecesRef = useRef<(HTMLDivElement | null)[]>([]);
   const logsContainerRef = useRef<HTMLDivElement>(null);
 
-  // 摇一摇掷骰子
+  // 摇一摇掷骰子（只在游戏中且没有弹窗时启用）
   const {
     isSupported: isShakeSupported,
     isPermissionGranted: isShakePermissionGranted,
     requestPermission: requestShakePermission,
   } = useDeviceShake({
     threshold: 25,
-    cooldown: 500,
+    cooldown: 1000,
+    shakeEndDelay: 300,
+    enabled:
+      phase === "playing" &&
+      !showCardDrawer &&
+      !activeEvent &&
+      !pickingTargetFor,
     onShake: () => {
       // 只有在游戏进行中、不是滚动中、不是移动中、不是选择目标时才能摇一摇
       if (phase === "playing" && !isRolling && !isMoving && !pickingTargetFor) {

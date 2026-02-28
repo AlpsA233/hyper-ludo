@@ -1,5 +1,22 @@
 @import "tailwindcss";
 
+/* 禁用 iOS 摇一摇撤销等系统手势，避免与游戏功能冲突 */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+/* 允许输入框正常选择文字 */
+input,
+textarea,
+[contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {
     display: none;
