@@ -78,6 +78,7 @@ export interface Translations {
     title: string;
     save: string;
     createNew: string;
+    editCard: string;
     name: string;
     namePlaceholder: string;
     emoji: string;
@@ -110,6 +111,7 @@ export interface Translations {
     title: string;
     save: string;
     createNew: string;
+    editEvent: string;
     content: string;
     color: string;
     target: string;
@@ -262,6 +264,7 @@ const zh: Translations = {
     skipTurnEffect: "暂停一回合",
     restartEffect: "回到起点",
     noEffect: "无效果",
+    editCard: "编辑卡牌",
   },
   eventEditor: {
     title: "事件编辑器",
@@ -284,6 +287,7 @@ const zh: Translations = {
     addEvent: "确认添加",
     noEvents: "暂无自定义事件",
     placeholder: "例如：做5个深蹲",
+    editEvent: "编辑事件",
   },
   game: {
     abort: "Abort Mission?",
@@ -416,6 +420,7 @@ const en: Translations = {
     skipTurnEffect: "Skip One Turn",
     restartEffect: "Back to Start",
     noEffect: "No Effect",
+    editCard: "Edit Card",
   },
   eventEditor: {
     title: "Event Editor",
@@ -438,6 +443,7 @@ const en: Translations = {
     addEvent: "Add Event",
     noEvents: "No custom events",
     placeholder: "e.g.: Do 5 squats",
+    editEvent: "Edit Event",
   },
   game: {
     abort: "Abort Mission?",
@@ -570,6 +576,7 @@ const ja: Translations = {
     skipTurnEffect: "1ターンスキップ",
     restartEffect: "スタート地点に戻る",
     noEffect: "効果なし",
+    editCard: "カードを編集",
   },
   eventEditor: {
     title: "イベントエディタ",
@@ -592,6 +599,7 @@ const ja: Translations = {
     addEvent: "イベントを追加",
     noEvents: "カスタムイベントなし",
     placeholder: "例：5つのスクワットをする",
+    editEvent: "イベントを編集",
   },
   game: {
     abort: "ミッションを中止しますか?",
@@ -726,6 +734,7 @@ const fr: Translations = {
     skipTurnEffect: "Sauter un tour",
     restartEffect: "Retour au début",
     noEffect: "Pas d'effet",
+    editCard: "Modifier la carte",
   },
   eventEditor: {
     title: "Éditeur d'événements",
@@ -748,6 +757,7 @@ const fr: Translations = {
     addEvent: "Ajouter un événement",
     noEvents: "Aucun événement personnalisé",
     placeholder: "Par exemple: Faire 5 squats",
+    editEvent: "Modifier l'événement",
   },
   game: {
     abort: "Abandonner la mission?",

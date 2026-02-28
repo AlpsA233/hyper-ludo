@@ -22,6 +22,7 @@ export default function CardEditor({
   t,
 }: CardEditorProps) {
   const [editList, setEditList] = useState(cards);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [newItem, setNewItem] = useState<Omit<Card, "instanceId" | "id">>({
     rarity: "NR",
     name: "",
@@ -36,9 +37,19 @@ export default function CardEditor({
     onSave(editList);
   };
 
-  const addCard = () => {
+  const addOrUpdateCard = () => {
     if (newItem.name.trim()) {
-      setEditList([...editList, { ...newItem, id: Date.now() }]);
+      if (editingId !== null) {
+        // 更新现有卡牌
+        setEditList(
+          editList.map((c) => (c.id === editingId ? { ...c, ...newItem } : c)),
+        );
+        setEditingId(null);
+      } else {
+        // 添加新卡牌
+        setEditList([...editList, { ...newItem, id: Date.now() }]);
+      }
+      // 重置表单
       setNewItem({
         rarity: "NR",
         name: "",
@@ -49,6 +60,39 @@ export default function CardEditor({
       });
       setEffectType("move");
     }
+  };
+
+  const startEditCard = (card: Card) => {
+    setEditingId(card.id);
+    setNewItem({
+      rarity: card.rarity,
+      name: card.name,
+      desc: card.desc,
+      pattern: card.pattern,
+      target: card.target,
+      effect: card.effect,
+    });
+    // 根据effect类型设置effectType
+    if (card.effect.move !== undefined) {
+      setEffectType("move");
+    } else if (card.effect.skip) {
+      setEffectType("skip");
+    } else if (card.effect.restart) {
+      setEffectType("restart");
+    }
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setNewItem({
+      rarity: "NR",
+      name: "",
+      desc: "",
+      pattern: "🎲",
+      target: "SELF",
+      effect: { move: 0 },
+    });
+    setEffectType("move");
   };
 
   const handleEffectTypeChange = (type: EffectType) => {
@@ -102,7 +146,9 @@ export default function CardEditor({
           <div className="bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col gap-4 overflow-y-auto">
             <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
               <Sparkles size={16} className="text-yellow-400" />
-              {t.cardEditor.createNew}
+              {editingId !== null
+                ? t.cardEditor.editCard || "编辑卡牌"
+                : t.cardEditor.createNew}
             </h3>
 
             {/* Name and Emoji */}
@@ -265,10 +311,17 @@ export default function CardEditor({
             )}
 
             <button
-              onClick={addCard}
-              className="w-full py-3 bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 rounded-xl font-bold border border-white/10 mt-auto transition-all shadow-lg hover:shadow-cyan-500/50">
-              {t.cardEditor.addCard}
+              onClick={addOrUpdateCard}
+              className="w-full py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-xl font-bold border border-white/10 text-sm transition-all shadow-lg active:scale-95">
+              {editingId !== null ? t.common.save : t.cardEditor.addCard}
             </button>
+            {editingId !== null && (
+              <button
+                onClick={cancelEdit}
+                className="w-full py-2 bg-white/5 border border-white/10 rounded-lg text-xs font-bold hover:bg-white/10 transition-colors">
+                {t.common.cancel}
+              </button>
+            )}
           </div>
 
           {/* Card List */}
@@ -304,13 +357,20 @@ export default function CardEditor({
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={() =>
-                    setEditList(editList.filter((c) => c.id !== card.id))
-                  }
-                  className="text-gray-600 hover:text-red-500 transition-colors p-2 hover:bg-red-500/10 rounded-lg">
-                  <Trash2 size={16} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => startEditCard(card)}
+                    className="text-gray-600 hover:text-cyan-400 transition-colors p-2 hover:bg-cyan-500/10 rounded-lg">
+                    ✏️
+                  </button>
+                  <button
+                    onClick={() =>
+                      setEditList(editList.filter((c) => c.id !== card.id))
+                    }
+                    className="text-gray-600 hover:text-red-500 transition-colors p-2 hover:bg-red-500/10 rounded-lg">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </div>
             ))}
             {editList.length === 0 && (

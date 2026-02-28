@@ -31,6 +31,7 @@ export default function EventEditor({
   t,
 }: EventEditorProps) {
   const [editList, setEditList] = useState(events);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [newItem, setNewItem] = useState<Omit<GameEvent, "id">>({
     text: "",
     type: "NONE",
@@ -45,9 +46,19 @@ export default function EventEditor({
     onSave(editList);
   };
 
-  const addEvent = () => {
+  const addOrUpdateEvent = () => {
     if (newItem.text.trim()) {
-      setEditList([...editList, { ...newItem, id: Date.now() }]);
+      if (editingId !== null) {
+        // 更新现有事件
+        setEditList(
+          editList.map((e) => (e.id === editingId ? { ...e, ...newItem } : e)),
+        );
+        setEditingId(null);
+      } else {
+        // 添加新事件
+        setEditList([...editList, { ...newItem, id: Date.now() }]);
+      }
+      // 重置表单
       setNewItem({
         text: "",
         type: "NONE",
@@ -58,6 +69,32 @@ export default function EventEditor({
         limitPerPlayer: undefined,
       });
     }
+  };
+
+  const startEditEvent = (event: GameEvent) => {
+    setEditingId(event.id);
+    setNewItem({
+      text: event.text,
+      type: event.type,
+      target: event.target,
+      val: event.val,
+      color: event.color,
+      progressRange: event.progressRange,
+      limitPerPlayer: event.limitPerPlayer,
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setNewItem({
+      text: "",
+      type: "NONE",
+      target: "SELF",
+      val: 0,
+      color: EVENT_COLORS[0].value,
+      progressRange: { min: 0, max: 100 },
+      limitPerPlayer: undefined,
+    });
   };
 
   const getTargetDisplay = (target: GameEvent["target"]) => {
@@ -97,7 +134,9 @@ export default function EventEditor({
           <div className="bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col gap-4 shadow-xl overflow-y-auto">
             <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
               <Sparkles size={16} className="text-purple-400" />
-              {t.eventEditor.createNew}
+              {editingId !== null
+                ? t.eventEditor.editEvent || "编辑事件"
+                : t.eventEditor.createNew}
             </h3>
 
             {/* Event Content */}
@@ -312,10 +351,17 @@ export default function EventEditor({
             )}
 
             <button
-              onClick={addEvent}
+              onClick={addOrUpdateEvent}
               className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl font-bold border border-white/10 mt-auto transition-all shadow-lg hover:shadow-purple-500/50">
-              {t.eventEditor.addEvent}
+              {editingId !== null ? t.common.save : t.eventEditor.addEvent}
             </button>
+            {editingId !== null && (
+              <button
+                onClick={cancelEdit}
+                className="w-full py-2 bg-white/5 border border-white/10 rounded-lg text-xs font-bold hover:bg-white/10 transition-colors">
+                {t.common.cancel}
+              </button>
+            )}
           </div>
 
           {/* Event List */}
@@ -371,13 +417,20 @@ export default function EventEditor({
                       )}
                     </div>
                   </div>
-                  <button
-                    onClick={() =>
-                      setEditList(editList.filter((i) => i.id !== item.id))
-                    }
-                    className="text-gray-600 hover:text-red-500 transition-colors p-2 hover:bg-red-500/10 rounded-lg">
-                    <Trash2 size={16} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => startEditEvent(item)}
+                      className="text-gray-600 hover:text-cyan-400 transition-colors p-2 hover:bg-cyan-500/10 rounded-lg">
+                      ✏️
+                    </button>
+                    <button
+                      onClick={() =>
+                        setEditList(editList.filter((i) => i.id !== item.id))
+                      }
+                      className="text-gray-600 hover:text-red-500 transition-colors p-2 hover:bg-red-500/10 rounded-lg">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
               ))
             )}
