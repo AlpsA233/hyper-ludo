@@ -136,8 +136,8 @@ export default function CardEditor({
           </button>
           <button
             onClick={save}
-            className="bg-cyan-600 hover:bg-cyan-500 px-6 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors">
-            <Save size={18} /> {t.common.save}
+            className="bg-cyan-600 hover:bg-cyan-500 px-4 sm:px-6 py-1 sm:py-2 rounded-lg font-bold flex items-center gap-2 transition-colors text-sm sm:text-base">
+            <Save size={16} className="sm:size-[18px]" /> {t.common.save}
           </button>
         </div>
       </div>

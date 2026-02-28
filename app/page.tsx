@@ -799,7 +799,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="relative z-10 w-full h-full flex flex-col items-center justify-center pt-22">
+      <main className="relative z-10 w-full h-full flex flex-col items-center justify-center pt-[100px] sm:pt-20">
         {phase === "setup" && (
           <GameSetup
             numPlayers={numPlayers}
