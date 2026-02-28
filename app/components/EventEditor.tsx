@@ -111,8 +111,8 @@ export default function EventEditor({
   };
 
   return (
-    <div className="fixed top-16 left-0 right-0 bottom-0 z-[100] bg-[#050510] flex flex-col animate-fade-in overflow-hidden">
-      <div className="flex justify-between items-center p-6 border-b border-white/10 bg-black/60 flex-shrink-0">
+    <div className="fixed top-[90px] left-0 right-0 bottom-0 z-[100] bg-[#050510] flex flex-col animate-fade-in overflow-hidden">
+      <div className="flex justify-between items-center px-6 py-4 border-b border-white/10 bg-black/60 flex-shrink-0">
         <h2 className="text-xl font-bold flex items-center gap-2">
           <MessageSquare className="text-purple-400" /> {t.eventEditor.title}
         </h2>

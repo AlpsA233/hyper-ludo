@@ -5,7 +5,6 @@ interface GameInfoSidebarProps {
   turn: number;
   numPlayers: number;
   lapsToWin: number;
-  diceValue: number;
   t: any;
 }
 
@@ -13,7 +12,6 @@ export default function GameInfoSidebar({
   turn,
   numPlayers,
   lapsToWin,
-  diceValue,
   t,
 }: GameInfoSidebarProps) {
   return (
@@ -35,14 +33,6 @@ export default function GameInfoSidebar({
             <span className="text-white/60">{t.totalLaps || "目标圈数"}:</span>
             <span className="text-white font-semibold">{lapsToWin}</span>
           </div>
-          {diceValue > 0 && (
-            <div className="flex justify-between items-center">
-              <span className="text-white/60">{t.lastDice || "上次掷骰"}:</span>
-              <span className="text-white font-semibold text-xl">
-                🎲 {diceValue}
-              </span>
-            </div>
-          )}
         </div>
       </div>
     </div>

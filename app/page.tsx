@@ -107,12 +107,14 @@ export default function App() {
   // --- 状态管理 ---
   const [phase, setPhase] = useState<GamePhase>("setup");
   const [numPlayers, setNumPlayers] = useState(4);
+  const [diceCount, setDiceCount] = useState(1);
   const [lapsToWin, setLapsToWin] = useState(3);
   const [initialCards, setInitialCards] = useState(5);
   const [eventDensity, setEventDensity] = useState(40); // 事件密度：0-100（百分比）
   const [players, setPlayers] = useState<Player[]>([]);
   const [turn, setTurn] = useState(0);
   const [diceValue, setDiceValue] = useState(1);
+  const [diceResults, setDiceResults] = useState<number[]>([]);
   const [isRolling, setIsRolling] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
@@ -149,7 +151,7 @@ export default function App() {
     Record<number, { emoji: string; hideTime: number }>
   >({});
 
-  const diceRef = useRef<HTMLDivElement>(null);
+  const diceRefs = useRef<(HTMLDivElement | null)[]>([]);
   const piecesRef = useRef<(HTMLDivElement | null)[]>([]);
   const logsContainerRef = useRef<HTMLDivElement>(null);
 
@@ -445,56 +447,87 @@ export default function App() {
       return;
     }
     setIsRolling(true);
+    setDiceResults([]); // 清除上一次的掷骰结果
     if ((window as any).gsap) {
-      // 1. First spin wildly
-      (window as any).gsap.to(diceRef.current, {
-        rotationX: "random(720, 1080)",
-        rotationY: "random(720, 1080)",
-        duration: 1,
-        ease: "power2.in",
-        onComplete: () => {
-          // 2. Determine value
-          const val = Math.floor(Math.random() * 6) + 1;
-          setDiceValue(val);
-          addLog(`Player ${turn + 1} rolled ${val}`);
+      // 1. 生成所有骰子的目标值
+      const results: number[] = Array.from({ length: diceCount }).map(
+        () => Math.floor(Math.random() * 6) + 1,
+      );
+      const totalValue = results.reduce((a, b) => a + b, 0);
 
-          // 3. Settle on the correct face
-          // Map value to face rotation
-          // 1: front (0,0), 2: right (0,-90), 3: back (0,180), 4: left (0,90), 5: top (-90,0), 6: bottom (90,0)
-          const targets: Record<number, { x: number; y: number }> = {
-            1: { x: 0, y: 0 },
-            2: { x: 0, y: -90 },
-            3: { x: 0, y: 180 },
-            4: { x: 0, y: 90 },
-            5: { x: -90, y: 0 },
-            6: { x: 90, y: 0 },
-          };
+      // 2. 对每个骰子进行动画
+      const animationPromises = diceRefs.current
+        .slice(0, diceCount)
+        .map((diceEl, idx) => {
+          return new Promise<void>((resolve) => {
+            if (!diceEl) {
+              resolve();
+              return;
+            }
 
-          const target = targets[val];
-          const currentX = (window as any).gsap.getProperty(
-            diceRef.current,
-            "rotationX",
-          );
-          const currentY = (window as any).gsap.getProperty(
-            diceRef.current,
-            "rotationY",
-          );
+            // 随机旋转
+            (window as any).gsap.to(diceEl, {
+              rotationX: "random(720, 1080)",
+              rotationY: "random(720, 1080)",
+              duration: 1,
+              ease: "power2.in",
+              delay: idx * 0.1, // 每个骰子延迟一点时间
+              onComplete: () => {
+                // 3. 停留在目标值
+                const displayValue = results[idx];
 
-          // Calculate nearest multiple of 360 to keep spinning in same direction
-          const nextX = Math.round(currentX / 360) * 360 + target.x;
-          const nextY = Math.round(currentY / 360) * 360 + target.y;
+                // Map value to face rotation
+                const targets: Record<number, { x: number; y: number }> = {
+                  1: { x: 0, y: 0 },
+                  2: { x: 0, y: -90 },
+                  3: { x: 0, y: 180 },
+                  4: { x: 0, y: 90 },
+                  5: { x: -90, y: 0 },
+                  6: { x: 90, y: 0 },
+                };
 
-          (window as any).gsap.to(diceRef.current, {
-            rotationX: nextX,
-            rotationY: nextY,
-            duration: 1,
-            ease: "back.out(1.7)",
-            onComplete: () => {
-              setIsRolling(false);
-              handleMove(val);
-            },
+                const target = targets[displayValue];
+                const currentX = (window as any).gsap.getProperty(
+                  diceEl,
+                  "rotationX",
+                );
+                const currentY = (window as any).gsap.getProperty(
+                  diceEl,
+                  "rotationY",
+                );
+
+                // Calculate nearest multiple of 360 to keep spinning in same direction
+                const nextX = Math.round(currentX / 360) * 360 + target.x;
+                const nextY = Math.round(currentY / 360) * 360 + target.y;
+
+                (window as any).gsap.to(diceEl, {
+                  rotationX: nextX,
+                  rotationY: nextY,
+                  duration: 1,
+                  ease: "back.out(1.7)",
+                  onComplete: () => {
+                    resolve();
+                  },
+                });
+              },
+            });
           });
-        },
+        });
+
+      // 4. 等待所有骰子动画完成
+      Promise.all(animationPromises).then(() => {
+        setDiceValue(totalValue);
+        setDiceResults(results);
+
+        // Log each dice result
+        const resultString =
+          diceCount === 1
+            ? `${totalValue}`
+            : `${results.join(", ")} (总计: ${totalValue})`;
+        addLog(`Player ${turn + 1} rolled ${resultString}`);
+
+        setIsRolling(false);
+        handleMove(totalValue);
       });
     }
   };
@@ -770,9 +803,11 @@ export default function App() {
         {phase === "setup" && (
           <GameSetup
             numPlayers={numPlayers}
+            diceCount={diceCount}
             lapsToWin={lapsToWin}
             eventDensity={eventDensity}
             onNumPlayersChange={setNumPlayers}
+            onDiceCountChange={setDiceCount}
             onLapsToWinChange={setLapsToWin}
             onEventDensityChange={setEventDensity}
             onManageConfig={() => setPhase("library_manager")}
@@ -839,7 +874,7 @@ export default function App() {
         )}
 
         {phase === "config_manager" && (
-          <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] bg-[#050510] flex flex-col animate-fade-in overflow-hidden">
+          <div className="fixed top-[90px] left-0 right-0 bottom-0 z-[100] bg-[#050510] flex flex-col animate-fade-in overflow-hidden">
             <div className="flex justify-between items-center p-6 border-b border-white/10 bg-black/60 flex-shrink-0">
               <h2 className="text-xl font-bold">配置导入导出</h2>
               <button
@@ -939,13 +974,15 @@ export default function App() {
 
               <DiceControl
                 diceValue={diceValue}
+                diceResults={diceResults}
+                diceCount={diceCount}
                 isRolling={isRolling}
                 isMoving={isMoving}
                 pickingTargetFor={pickingTargetFor}
                 hasUsedCard={hasUsedCard}
                 players={players}
                 turn={turn}
-                diceRef={diceRef}
+                diceRefs={diceRefs}
                 handleRollDice={handleRollDice}
                 setShowCardDrawer={setShowCardDrawer}
                 t={t.game}
@@ -959,7 +996,6 @@ export default function App() {
                 turn={turn}
                 numPlayers={numPlayers}
                 lapsToWin={lapsToWin}
-                diceValue={diceValue}
                 t={t.game}
               />
             )}

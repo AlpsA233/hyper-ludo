@@ -6,9 +6,11 @@ import type { Translations } from "@/app/locales";
 
 interface GameSetupProps {
   numPlayers: number;
+  diceCount: number;
   lapsToWin: number;
   eventDensity: number;
   onNumPlayersChange: (num: number) => void;
+  onDiceCountChange: (count: number) => void;
   onLapsToWinChange: (laps: number) => void;
   onEventDensityChange: (density: number) => void;
   onManageConfig: () => void;
@@ -19,9 +21,11 @@ interface GameSetupProps {
 
 export default function GameSetup({
   numPlayers,
+  diceCount,
   lapsToWin,
   eventDensity,
   onNumPlayersChange,
+  onDiceCountChange,
   onLapsToWinChange,
   onEventDensityChange,
   onManageConfig,
@@ -55,17 +59,31 @@ export default function GameSetup({
           </div>
           <div>
             <label className="text-[10px] text-gray-500 block mb-1 font-bold uppercase tracking-wider">
-              {t.setup.lapsToWin}
+              {t.setup.diceCount}
             </label>
             <input
               type="number"
-              value={lapsToWin}
+              value={diceCount}
               min="1"
-              max="10"
-              onChange={(e) => onLapsToWinChange(+e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-purple-500"
+              max="3"
+              onChange={(e) => onDiceCountChange(+e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-500"
             />
           </div>
+        </div>
+
+        <div>
+          <label className="text-[10px] text-gray-500 block mb-1 font-bold uppercase tracking-wider">
+            {t.setup.lapsToWin}
+          </label>
+          <input
+            type="number"
+            value={lapsToWin}
+            min="1"
+            max="10"
+            onChange={(e) => onLapsToWinChange(+e.target.value)}
+            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-purple-500"
+          />
         </div>
 
         {/* 事件密度设置 */}

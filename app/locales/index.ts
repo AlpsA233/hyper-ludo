@@ -14,6 +14,8 @@ export interface Translations {
   // Game Setup
   setup: {
     title: string;
+    diceCount: string;
+    diceCountHint: string;
     numPlayers: string;
     lapsToWin: string;
     eventDensity: string;
@@ -134,6 +136,7 @@ export interface Translations {
   // Game
   game: {
     abort: string;
+    total: string;
     abortMessage: string;
     taskComplete: string;
     cardUsed: string;
@@ -181,6 +184,8 @@ const zh: Translations = {
   },
   setup: {
     title: "星际派对配置",
+    diceCount: "骰子个数",
+    diceCountHint: "选择掷骰的个数(1-3个)",
     numPlayers: "玩家人数",
     lapsToWin: "胜利圈数",
     eventDensity: "事件密度",
@@ -291,6 +296,7 @@ const zh: Translations = {
   },
   game: {
     abort: "Abort Mission?",
+    total: "Total",
     abortMessage: "确定要退出游戏吗?",
     taskComplete: "任务已完成",
     cardUsed: "{name} 使用了 [{card}]",
@@ -336,6 +342,8 @@ const en: Translations = {
   },
   setup: {
     title: "Space Party Config",
+    diceCount: "Number of Dice",
+    diceCountHint: "Choose the number of dice to roll (1-3)",
     numPlayers: "Number of Players",
     lapsToWin: "Laps to Win",
     eventDensity: "Event Density",
@@ -447,6 +455,7 @@ const en: Translations = {
   },
   game: {
     abort: "Abort Mission?",
+    total: "Total",
     abortMessage: "Are you sure you want to quit the game?",
     taskComplete: "Task Completed",
     cardUsed: "{name} used [{card}]",
@@ -492,6 +501,8 @@ const ja: Translations = {
   },
   setup: {
     title: "スペースパーティ設定",
+    diceCount: "サイコロの数",
+    diceCountHint: "ロールするサイコロの数を選択(1-3個)",
     numPlayers: "プレイヤー数",
     lapsToWin: "勝利ラップ",
     eventDensity: "イベント密度",
@@ -603,6 +614,7 @@ const ja: Translations = {
   },
   game: {
     abort: "ミッションを中止しますか?",
+    total: "合計",
     abortMessage: "ゲームを終了してもよろしいですか?",
     taskComplete: "タスク完了",
     cardUsed: "{name}は[{card}]を使用しました",
@@ -649,6 +661,8 @@ const fr: Translations = {
   },
   setup: {
     title: "Configuration du Party Spatial",
+    diceCount: "Nombre de dés",
+    diceCountHint: "Choisissez le nombre de dés à lancer (1-3)",
     numPlayers: "Nombre de joueurs",
     lapsToWin: "Tours pour gagner",
     eventDensity: "Densité d'événements",
@@ -761,6 +775,7 @@ const fr: Translations = {
   },
   game: {
     abort: "Abandonner la mission?",
+    total: "Total",
     abortMessage: "Êtes-vous sûr de vouloir quitter le jeu?",
     taskComplete: "Tâche terminée",
     cardUsed: "{name} a utilisé [{card}]",
