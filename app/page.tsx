@@ -644,7 +644,8 @@ export default function App() {
 
     if (player.pos === -1) {
       // 如果还没进入棋盘，直接走指定步数
-      totalDistance = steps;
+      // 但不允许退出棋盘
+      totalDistance = Math.max(0, steps);
     } else {
       // 玩家当前已经走过的距离
       const currentDistance =
@@ -1009,11 +1010,13 @@ export default function App() {
             // 应用事件效果
             if (activeEvent.type === "MOVE" && activeEvent.val !== 0) {
               // 移动效果：更新受影响玩家的位置
+              // 为避免多玩家依赖问题，对每个玩家都基于原始状态计算
               setPlayers((prev) => {
                 const next = [...prev];
                 affectedIndices.forEach((idx) => {
+                  // 使用原始prev中的玩家状态，而不是已修改的next
                   const newPosition = calculateNewPosition(
-                    next[idx],
+                    prev[idx],
                     activeEvent.val,
                   );
                   next[idx] = {
