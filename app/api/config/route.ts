@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
+import { createHash } from "crypto";
 
-// 生成8位随机配置ID
-function generateConfigId(): string {
-  const chars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let result = "";
-  for (let i = 0; i < 8; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
+// 根据配置内容生成固定ID（相同配置生成相同ID）
+function generateConfigId(config: any): string {
+  const content = JSON.stringify(config);
+  const hash = createHash("sha256").update(content).digest("hex");
+  // 取前8位作为ID
+  return hash.substring(0, 8);
 }
 
 export async function POST(request: NextRequest) {
@@ -24,17 +22,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 生成唯一ID
-    let configId = generateConfigId();
-    let exists = await kv.exists(`config:${configId}`);
+    // 创建配置对象（不包含时间戳，确保相同内容生成相同ID）
+    const configContent = { cards, events };
 
-    // 确保ID不重复
-    while (exists) {
-      configId = generateConfigId();
-      exists = await kv.exists(`config:${configId}`);
-    }
+    // 根据内容生成ID
+    const configId = generateConfigId(configContent);
 
-    // 创建配置对象
+    // 创建完整配置（包含ID和时间戳）
     const config = {
       id: configId,
       cards,
@@ -42,7 +36,7 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString(),
     };
 
-    // 存储到 Vercel KV，30天后过期
+    // 存储到 Vercel KV，30天后过期（相同配置会刷新过期时间）
     await kv.set(`config:${configId}`, JSON.stringify(config), {
       ex: 60 * 60 * 24 * 30, // 30天
     });
