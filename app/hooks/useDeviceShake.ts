@@ -25,28 +25,13 @@ export function useDeviceShake(options: UseDeviceShakeOptions = {}) {
 
     setIsSupported(true);
 
-    // iOS 13+ 需要请求权限
-    const requestPermission = async () => {
-      if (
-        typeof DeviceMotionEvent !== "undefined" &&
-        typeof (DeviceMotionEvent as any).requestPermission === "function"
-      ) {
-        try {
-          const permission = await (
-            DeviceMotionEvent as any
-          ).requestPermission();
-          setIsPermissionGranted(permission === "granted");
-        } catch (error) {
-          console.error("Motion permission error:", error);
-          setIsPermissionGranted(false);
-        }
-      } else {
-        // Android 或旧版 iOS，直接支持
-        setIsPermissionGranted(true);
-      }
-    };
-
-    requestPermission();
+    // 对于非iOS或旧版iOS，直接设置为已授权
+    if (
+      typeof DeviceMotionEvent !== "undefined" &&
+      typeof (DeviceMotionEvent as any).requestPermission !== "function"
+    ) {
+      setIsPermissionGranted(true);
+    }
   }, []);
 
   useEffect(() => {

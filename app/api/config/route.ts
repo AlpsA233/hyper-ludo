@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, readFile, mkdir } from "fs/promises";
-import { join } from "path";
-import { existsSync } from "fs";
+import { kv } from "@vercel/kv";
 
-const CONFIG_DIR = join(process.cwd(), "public", "configs");
-
-// 生成8位随机中英文数字组合
+// 生成8位随机配置ID
 function generateConfigId(): string {
   const chars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789中英配置";
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let result = "";
   for (let i = 0; i < 8; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -18,11 +14,6 @@ function generateConfigId(): string {
 
 export async function POST(request: NextRequest) {
   try {
-    // 确保配置目录存在
-    if (!existsSync(CONFIG_DIR)) {
-      await mkdir(CONFIG_DIR, { recursive: true });
-    }
-
     const body = await request.json();
     const { cards, events } = body;
 
@@ -33,17 +24,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 生成唯一ID和文件名
+    // 生成唯一ID
     let configId = generateConfigId();
-    let filePath = join(CONFIG_DIR, `${configId}.json`);
+    let exists = await kv.exists(`config:${configId}`);
 
-    // 确保文件名不重复
-    while (existsSync(filePath)) {
+    // 确保ID不重复
+    while (exists) {
       configId = generateConfigId();
-      filePath = join(CONFIG_DIR, `${configId}.json`);
+      exists = await kv.exists(`config:${configId}`);
     }
 
-    // 保存配置
+    // 创建配置对象
     const config = {
       id: configId,
       cards,
@@ -51,7 +42,10 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString(),
     };
 
-    await writeFile(filePath, JSON.stringify(config, null, 2));
+    // 存储到 Vercel KV，30天后过期
+    await kv.set(`config:${configId}`, JSON.stringify(config), {
+      ex: 60 * 60 * 24 * 30, // 30天
+    });
 
     return NextResponse.json({
       success: true,
@@ -77,15 +71,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "缺少配置ID" }, { status: 400 });
     }
 
-    const filePath = join(CONFIG_DIR, `${configId}.json`);
+    // 从 Vercel KV 读取配置
+    const configStr = await kv.get<string>(`config:${configId}`);
 
-    if (!existsSync(filePath)) {
-      return NextResponse.json({ error: "配置不存在" }, { status: 404 });
+    if (!configStr) {
+      return NextResponse.json(
+        { error: "配置不存在或已过期" },
+        { status: 404 },
+      );
     }
 
-    const content = await readFile(filePath, "utf-8");
-    const config = JSON.parse(content);
-
+    const config = JSON.parse(configStr);
     return NextResponse.json(config);
   } catch (error) {
     console.error("Config load error:", error);

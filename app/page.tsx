@@ -157,7 +157,11 @@ export default function App() {
   const logsContainerRef = useRef<HTMLDivElement>(null);
 
   // 摇一摇掷骰子
-  const { isSupported: isShakeSupported, isPermissionGranted: isShakePermissionGranted } = useDeviceShake({
+  const {
+    isSupported: isShakeSupported,
+    isPermissionGranted: isShakePermissionGranted,
+    requestPermission: requestShakePermission,
+  } = useDeviceShake({
     threshold: 25,
     cooldown: 500,
     onShake: () => {
@@ -908,7 +912,7 @@ export default function App() {
         )}
 
         {phase === "config_manager" && (
-          <div className="fixed top-[90px] left-0 right-0 bottom-0 z-[100] bg-[#050510] flex flex-col animate-fade-in overflow-hidden">
+          <div className="fixed top-[110px] left-0 right-0 bottom-0 z-[100] bg-[#050510] flex flex-col animate-fade-in overflow-hidden">
             <div className="flex justify-between items-center p-6 border-b border-white/10 bg-black/60 flex-shrink-0">
               <h2 className="text-xl font-bold">配置导入导出</h2>
               <button
@@ -1021,7 +1025,9 @@ export default function App() {
                 setShowCardDrawer={setShowCardDrawer}
                 t={t.game}
                 isPC={isPC}
-                isShakeSupported={isShakeSupported && isShakePermissionGranted}
+                isShakeSupported={isShakeSupported}
+                isShakePermissionGranted={isShakePermissionGranted}
+                requestShakePermission={requestShakePermission}
               />
             </div>
 
