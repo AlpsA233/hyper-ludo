@@ -272,12 +272,19 @@ export default function App() {
     // 重置事件计数
     setEventCounts({});
 
-    const tiles: BoardTile[] = Array.from({ length: totalSteps }).map((_, i) =>
-      i % (totalSteps / numPlayers) < 2
-        ? { id: "SAFE" as const }
-        : Math.random() < 0.4
+    const tiles: BoardTile[] = Array.from({ length: totalSteps }).map(
+      (_, i) => {
+        // 起始点附近保持安全
+        if (i % (totalSteps / numPlayers) < 2) {
+          return { id: "SAFE" as const };
+        }
+        // 根据事件密度生成CUSTOM格子
+        // eventDensity=0: 没有CUSTOM格子
+        // eventDensity=100: 所有非起始格子都是CUSTOM
+        return Math.random() * 100 < eventDensity
           ? { id: "CUSTOM" as const }
-          : { id: "SAFE" as const },
+          : { id: "SAFE" as const };
+      },
     );
     setBoardTiles(tiles);
 
@@ -525,12 +532,10 @@ export default function App() {
         return next;
       });
       addLog(`Player ${turn + 1} moved to pos ${finalPos} (lap ${newLap})`);
-      // 事件触发: CUSTOM格子 或 根据事件密度在任意位置触发
+      // 事件触发: 只在CUSTOM格子上触发
       const isCustomTile =
         finalPos !== -1 && boardTiles[finalPos]?.id === "CUSTOM";
-      const willTriggerByDensity =
-        finalPos !== -1 && Math.random() * 100 < eventDensity;
-      const willTriggerEvent = isCustomTile || willTriggerByDensity;
+      const willTriggerEvent = isCustomTile;
 
       if (willTriggerEvent) {
         setTimeout(() => {
