@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     };
 
     // 存储到 Vercel KV，30天后过期（相同配置会刷新过期时间）
-    await kv.set(`config:${configId}`, JSON.stringify(config), {
+    await kv.set(`config:${configId}`, config, {
       ex: 60 * 60 * 24 * 30, // 30天
     });
 
@@ -66,16 +66,15 @@ export async function GET(request: NextRequest) {
     }
 
     // 从 Vercel KV 读取配置
-    const configStr = await kv.get<string>(`config:${configId}`);
+    const config = await kv.get(`config:${configId}`);
 
-    if (!configStr) {
+    if (!config) {
       return NextResponse.json(
         { error: "配置不存在或已过期" },
         { status: 404 },
       );
     }
 
-    const config = JSON.parse(configStr);
     return NextResponse.json(config);
   } catch (error) {
     console.error("Config load error:", error);
