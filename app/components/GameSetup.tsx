@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
-import { Target, Upload } from "lucide-react";
+import React, { useState } from "react";
+import { Target, Upload, Settings } from "lucide-react";
 import type { Translations } from "@/app/locales";
 
 interface GameSetupProps {
@@ -12,6 +12,7 @@ interface GameSetupProps {
   onLapsToWinChange: (laps: number) => void;
   onEventDensityChange: (density: number) => void;
   onManageConfig: () => void;
+  onUserSettings: () => void;
   onStartGame: () => void;
   t: Translations;
 }
@@ -24,9 +25,11 @@ export default function GameSetup({
   onLapsToWinChange,
   onEventDensityChange,
   onManageConfig,
+  onUserSettings,
   onStartGame,
   t,
 }: GameSetupProps) {
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   return (
     <div className="w-[90%] max-w-sm p-6 bg-black/60 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl animate-fade-in">
       <div className="text-center mb-6">
@@ -95,12 +98,32 @@ export default function GameSetup({
           </p>
         </div>
 
-        <div className="flex flex-col gap-2 pt-2">
+        <div className="flex flex-col gap-2 pt-2 relative">
           <button
-            onClick={onManageConfig}
+            onClick={() => setShowSettingsMenu(!showSettingsMenu)}
             className="w-full py-2 bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:from-orange-500/20 hover:to-red-500/20 transition-all shadow-lg active:scale-95">
-            <Upload size={14} /> {t.setup.manageLibraries}
+            <Settings size={14} /> {t.settings.title}
           </button>
+          {showSettingsMenu && (
+            <div className="absolute bottom-full left-0 right-0 mb-2 bg-black/90 border border-white/10 rounded-lg shadow-xl overflow-hidden z-50">
+              <button
+                onClick={() => {
+                  onUserSettings();
+                  setShowSettingsMenu(false);
+                }}
+                className="w-full px-4 py-2.5 text-left text-xs hover:bg-white/10 transition-colors border-b border-white/5">
+                {t.settings.title}
+              </button>
+              <button
+                onClick={() => {
+                  onManageConfig();
+                  setShowSettingsMenu(false);
+                }}
+                className="w-full px-4 py-2.5 text-left text-xs hover:bg-white/10 transition-colors">
+                {t.setup.libraryManager}
+              </button>
+            </div>
+          )}
         </div>
         <button
           onClick={onStartGame}

@@ -770,6 +770,7 @@ export default function App() {
             onLapsToWinChange={setLapsToWin}
             onEventDensityChange={setEventDensity}
             onManageConfig={() => setPhase("library_manager")}
+            onUserSettings={() => setPhase("settings")}
             onStartGame={startGame}
             t={t}
           />

@@ -75,7 +75,7 @@ export default function PlayerSidebar({
 
   if (isPC) {
     return (
-      <div className="w-64 flex-shrink-0 flex flex-col gap-4 pt-4 px-2">
+      <div className="w-64 flex-shrink-0 flex flex-col gap-4 pt-4 px-2 max-h-[calc(100vh-120px)] overflow-y-auto">
         {displayPlayers.map(({ player: p, index: i }) => {
           const progress = calculateProgress(p, i);
           const rank = getRank(i);

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { MessageSquare, Save, Trash2, Sparkles } from "lucide-react";
+import { MessageSquare, Save, Trash2, Sparkles, X } from "lucide-react";
 import type { GameEvent } from "@/app/types";
 import type { Translations } from "@/app/locales";
 
@@ -79,11 +79,18 @@ export default function EventEditor({
         <h2 className="text-xl font-bold flex items-center gap-2">
           <MessageSquare className="text-purple-400" /> {t.eventEditor.title}
         </h2>
-        <button
-          onClick={save}
-          className="bg-purple-600 hover:bg-purple-500 px-6 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors">
-          <Save size={18} /> {t.eventEditor.save}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={onCancel}
+            className="w-10 h-10 rounded-lg flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
+            <X size={20} />
+          </button>
+          <button
+            onClick={save}
+            className="bg-purple-600 hover:bg-purple-500 px-6 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors">
+            <Save size={18} /> {t.common.save}
+          </button>
+        </div>
       </div>
       <div className="p-4 flex-1 overflow-hidden">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full overflow-hidden">
