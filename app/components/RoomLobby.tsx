@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Play, Copy, Check, X, LogOut } from "lucide-react";
 import type { Translations } from "@/app/locales";
 import { useRoom, type RoomInfo, type RoomPlayer } from "@/app/hooks/useRoom";
@@ -35,6 +35,12 @@ export default function RoomLobby({
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // 使用 ref 存储最新的回调，避免闭包问题
+  const onStartGameRef = useRef(onStartGame);
+  useEffect(() => {
+    onStartGameRef.current = onStartGame;
+  }, [onStartGame]);
+
   // 加载房间数据和订阅实时更新
   useEffect(() => {
     loadRoom(roomId);
@@ -45,9 +51,10 @@ export default function RoomLobby({
   // 监听房间状态变化：当游戏开始时自动跳转
   useEffect(() => {
     if (room && room.state === "playing") {
-      onStartGame?.();
+      console.log("🎮 Room state changed to PLAYING, triggering onStartGame");
+      onStartGameRef.current?.();
     }
-  }, [room?.state, onStartGame]);
+  }, [room?.state]);
 
   const handleStartGame = async () => {
     setLoading(true);
