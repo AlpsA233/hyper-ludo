@@ -334,6 +334,7 @@ export default function App() {
   }, [cardEffectDisplay]);
 
   // 多人游戏：订阅房间 Realtime 更新
+  // 建立 Realtime 订阅 - 仅在 roomId 变化时
   useEffect(() => {
     if (!roomId) return;
 
@@ -343,18 +344,22 @@ export default function App() {
     // 建立 Realtime 订阅
     const unsubscribe = subscribe(roomId);
 
-    // 计算当前玩家的索引（基于 roomPlayers 中的顺序）
-    if (room && roomPlayers.length > 0 && user?.id) {
-      const myIndex = roomPlayers.findIndex((p) => p.user_id === user.id);
-      setCurrentPlayerIndex(myIndex >= 0 ? myIndex : null);
-      console.log("👤 当前玩家索引:", myIndex);
-    }
-
     return () => {
       console.log("❌ 取消 Realtime 订阅:", roomId);
       unsubscribe();
     };
-  }, [roomId, subscribe, room, roomPlayers, user?.id]);
+  }, [roomId, subscribe]);
+
+  // 计算当前玩家索引 - 单独的 effect，在 roomPlayers 变化时运行
+  useEffect(() => {
+    if (!roomId || !room || roomPlayers.length === 0 || !user?.id) return;
+
+    const myIndex = roomPlayers.findIndex((p) => p.user_id === user.id);
+    setCurrentPlayerIndex(myIndex >= 0 ? myIndex : null);
+    if (myIndex >= 0) {
+      console.log("👤 当前玩家索引:", myIndex);
+    }
+  }, [roomPlayers, user?.id, room, roomId]);
 
   // 多人游戏：当 gameState 变化时，同步本地状态
   useEffect(() => {
@@ -1288,12 +1293,10 @@ export default function App() {
 
                 await startMultiplayerGame();
 
-                // 重新加载最新的房间数据到 useRoom 状态
-                await loadRoom(roomId);
-                // 再等一下，确保状态更新完成
-                await new Promise((resolve) => setTimeout(resolve, 100));
-
-                // 使用房间配置初始化游戏
+                // 注意：不要调用 loadRoom()，因为 startMultiplayerGame() 已经会更新房间状态
+                // 避免Realtime订阅被中断和重新建立
+                // await loadRoom(roomId);
+                // await new Promise((resolve) => setTimeout(resolve, 100));
                 const numPlayersFromRoom =
                   latestRoom?.num_players || numPlayers;
                 if (latestRoom) {
