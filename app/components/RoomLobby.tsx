@@ -133,6 +133,9 @@ export default function RoomLobby({
   const handleStartGame = async () => {
     setLoading(true);
     try {
+      // 先重新加载最新房间数据，确保配置改动已生效
+      await loadRoom(roomId);
+      
       await startGame();
       onStartGame?.();
     } catch (err) {

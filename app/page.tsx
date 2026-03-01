@@ -1104,6 +1104,9 @@ export default function App() {
             userId={user?.id || null}
             onStartGame={async () => {
               try {
+                // 等待 Realtime 同步最新房间配置
+                await new Promise(resolve => setTimeout(resolve, 200));
+                
                 await startMultiplayerGame();
 
                 // 使用房间配置初始化游戏
