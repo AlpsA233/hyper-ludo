@@ -120,6 +120,16 @@ CREATE POLICY "Room players can view their room - creators"
     )
   );
 
+CREATE POLICY "Room players can view all players in their room"
+  ON room_players FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM room_players rp
+      WHERE rp.room_id = room_players.room_id
+        AND rp.user_id = auth.uid()
+    )
+  );
+
 CREATE POLICY "Users can insert themselves as room player"
   ON room_players FOR INSERT
   WITH CHECK (auth.uid() = user_id);

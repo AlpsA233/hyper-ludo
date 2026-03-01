@@ -31,21 +31,26 @@ export default function RoomManager({
   const [copied, setCopied] = useState(false);
 
   const handleCreateRoom = async () => {
+    if (!playerName.trim()) {
+      setError("Please enter your name");
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
-      const roomId = await createRoom({
-        num_players: 4,
-        dice_count: 1,
-        laps_to_win: 3,
-        initial_cards: 5,
-        event_density: 40,
-      });
+      const roomId = await createRoom(
+        {
+          num_players: 4,
+          dice_count: 1,
+          laps_to_win: 3,
+          initial_cards: 5,
+          event_density: 40,
+        },
+        playerName,
+      );
 
-      // 重新加载房间数据以获取房间码
-      // 这里可以直接从 useRoom 的 room 状态获取
-      // 为了简化，我们让父组件重新传递房间码
       onRoomCreated?.(roomId);
     } catch (err: any) {
       setError(err.message || "Failed to create room");
@@ -145,6 +150,20 @@ export default function RoomManager({
               </div>
             )}
 
+            {/* 玩家名字输入 */}
+            <div>
+              <label className="block text-xs font-bold text-gray-400 mb-2">
+                {t.common?.playerName || "Your Name"}
+              </label>
+              <input
+                type="text"
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                placeholder={t.common?.playerName || "Enter your name"}
+                className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50"
+              />
+            </div>
+
             <button
               onClick={handleCreateRoom}
               disabled={loading}
@@ -156,6 +175,7 @@ export default function RoomManager({
               onClick={() => {
                 setMode("select");
                 setError(null);
+                setPlayerName("");
               }}
               className="w-full py-2 px-4 bg-white/10 hover:bg-white/20 rounded-xl font-bold text-white transition-colors text-sm">
               {t.common?.back || "Back"}

@@ -2,7 +2,12 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import type { Player } from "../types";
 
-// 调用本地的 API Routes
+// 获取 Edge Function URL
+const ROOM_SERVICE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
+  ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/room-service`
+  : "";
+
+// 辅助函数：调用房间服务 Edge Function
 async function callRoomService(action: string, data: any) {
   const {
     data: { session },
@@ -12,7 +17,7 @@ async function callRoomService(action: string, data: any) {
     throw new Error("User not authenticated");
   }
 
-  const response = await fetch("/api/rooms", {
+  const response = await fetch(ROOM_SERVICE_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -66,16 +71,13 @@ interface UseRoomReturn {
   error: string | null;
 
   // 操作方法
-  createRoom: (
-    config: {
-      num_players: number;
-      dice_count: number;
-      laps_to_win: number;
-      initial_cards: number;
-      event_density: number;
-    },
-    playerName?: string,
-  ) => Promise<string>; // 返回roomId
+  createRoom: (config: {
+    num_players: number;
+    dice_count: number;
+    laps_to_win: number;
+    initial_cards: number;
+    event_density: number;
+  }, playerName?: string) => Promise<string>; // 返回roomId
   joinRoom: (
     roomCode: string,
     playerName: string,
@@ -90,12 +92,14 @@ interface UseRoomReturn {
   ) => Promise<void>;
   endGame: () => Promise<void>;
   loadRoom: (roomId: string) => Promise<void>;
+
+  // 实时订阅
   subscribe: (roomId: string) => () => void; // 返回取消订阅函数
 }
 
 /**
  * 房间管理 Hook
- * 所有操作都通过服务端 API 进行，确保数据一致性
+ * 处理房间创建、加入、玩家同步等
  */
 export function useRoom(userId: string | null): UseRoomReturn {
   const [room, setRoom] = useState<RoomInfo | null>(null);
@@ -103,7 +107,23 @@ export function useRoom(userId: string | null): UseRoomReturn {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 创建房间（通过服务端 API）
+  // 生成房间码（6位：2位数字 + 4位字母/数字，避免 O/I/L）
+  // 例如：42ABCD, 17XYZ9
+  const generateRoomCode = (): string => {
+    const chars = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"; // 避免 0/1/I/L/O
+    const nums = "23456789";
+    let code = "";
+    // 2位数字
+    code += nums[Math.floor(Math.random() * nums.length)];
+    code += nums[Math.floor(Math.random() * nums.length)];
+    // 4位字母/数字
+    for (let i = 0; i < 4; i++) {
+      code += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return code;
+  };
+
+  // 创建房间，可选指定创建者的玩家名字
   const createRoom = async (
     config: {
       num_players: number;
@@ -120,18 +140,63 @@ export function useRoom(userId: string | null): UseRoomReturn {
     setError(null);
 
     try {
-      // 调用服务端 API，获取完整的房间和玩家数据
-      const { room: newRoom, players: newPlayers } = await callRoomService(
-        "createRoom",
-        {
-          config,
-          playerName,
-        },
-      );
+      // 生成唯一房间码
+      let roomCode = generateRoomCode();
+      let codeExists = true;
+      while (codeExists) {
+        const { data: existing } = await supabase
+          .from("rooms")
+          .select("id")
+          .eq("room_code", roomCode)
+          .maybeSingle();
+        if (!existing) codeExists = false;
+        else roomCode = generateRoomCode();
+      }
 
+      // 创建房间
+      const { data: newRoom, error: insertError } = await supabase
+        .from("rooms")
+        .insert({
+          room_code: roomCode,
+          creator_id: userId,
+          state: "waiting",
+          current_players: 1,
+          ...config,
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      // 创建者加入房间
+      const { error: playerError } = await supabase
+        .from("room_players")
+        .insert({
+          room_id: newRoom.id,
+          user_id: userId,
+          player_index: 0,
+          player_name: playerName,
+          avatar: "👤",
+          color_index: 0,
+        });
+
+      if (playerError) throw playerError;
+
+      // 设置房间信息和玩家列表
       setRoom(newRoom);
-      setPlayers(newPlayers);
-
+      setPlayers([
+        {
+          id: "", // 暂时空，实际会在订阅时更新
+          room_id: newRoom.id,
+          user_id: userId,
+          player_index: 0,
+          player_name: playerName,
+          avatar: "👤",
+          color_index: 0,
+          position: -1,
+          lap: 0,
+        },
+      ]);
       return newRoom.id;
     } catch (err: any) {
       const msg = err.message || "Failed to create room";
@@ -142,7 +207,7 @@ export function useRoom(userId: string | null): UseRoomReturn {
     }
   };
 
-  // 加入房间（通过服务端 API）
+  // 加入房间，返回房间ID
   const joinRoom = async (
     roomCode: string,
     playerName: string,
@@ -154,19 +219,57 @@ export function useRoom(userId: string | null): UseRoomReturn {
     setError(null);
 
     try {
-      // 调用服务端 API，获取完整的房间和玩家数据
-      const { room: targetRoom, players: newPlayers } = await callRoomService(
-        "joinRoom",
-        {
-          roomCode,
-          playerName,
-        },
-      );
+      // 查找房间
+      const { data: targetRoom, error: findError } = await supabase
+        .from("rooms")
+        .select("*")
+        .eq("room_code", roomCode)
+        .maybeSingle();
+
+      if (findError || !targetRoom) throw new Error("Room not found");
+      if (targetRoom.state !== "waiting")
+        throw new Error("Game already started");
+      if (targetRoom.current_players >= targetRoom.max_players)
+        throw new Error("Room is full");
+
+      // 检查玩家是否已在房间中
+      const { data: existing } = await supabase
+        .from("room_players")
+        .select("id")
+        .eq("room_id", targetRoom.id)
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (existing) throw new Error("Already in this room");
+
+      // 获取当前玩家数量以分配index
+      const { data: existingPlayers } = await supabase
+        .from("room_players")
+        .select("player_index")
+        .eq("room_id", targetRoom.id);
+
+      const playerIndex = existingPlayers?.length || 0;
+
+      // 加入房间
+      const { error: joinError } = await supabase.from("room_players").insert({
+        room_id: targetRoom.id,
+        user_id: userId,
+        player_index: playerIndex,
+        player_name: playerName,
+        avatar: avatar,
+        color_index: playerIndex,
+      });
+
+      if (joinError) throw joinError;
+
+      // 更新房间玩家数量
+      await supabase
+        .from("rooms")
+        .update({ current_players: playerIndex + 1 })
+        .eq("id", targetRoom.id);
 
       setRoom(targetRoom);
-      setPlayers(newPlayers);
-
-      return targetRoom.id;
+      return targetRoom.id; // 返回房间ID
     } catch (err: any) {
       const msg = err.message || "Failed to join room";
       setError(msg);
@@ -176,15 +279,20 @@ export function useRoom(userId: string | null): UseRoomReturn {
     }
   };
 
-  // 离开房间（通过服务端 API）
+  // 离开房间（触发器会自动删除空房间）
   const leaveRoom = async (): Promise<void> => {
     if (!userId || !room) return;
 
     try {
-      // 调用服务端 API
-      await callRoomService("leaveRoom", {
-        roomId: room.id,
-      });
+      // 删除玩家记录
+      // 触发器 cleanup_empty_room_after_player_delete 会自动：
+      // 1. 如果房间无玩家了，删除房间及其 room_games
+      // 2. 如果房间还有玩家，更新 current_players 计数
+      await supabase
+        .from("room_players")
+        .delete()
+        .eq("room_id", room.id)
+        .eq("user_id", userId);
 
       setRoom(null);
       setPlayers([]);
@@ -264,22 +372,34 @@ export function useRoom(userId: string | null): UseRoomReturn {
     }
   };
 
-  // 加载房间数据（通过服务端 API）
+  // 加载指定房间的数据
   const loadRoom = useCallback(async (roomId: string): Promise<void> => {
     setLoading(true);
     setError(null);
 
     try {
-      // 调用服务端 API，获取完整的房间和玩家数据
-      const { room: roomData, players: playersData } = await callRoomService(
-        "getRoomInfo",
-        {
-          roomId,
-        },
-      );
+      // 加载房间信息
+      const { data: roomData, error: roomError } = await supabase
+        .from("rooms")
+        .select("*")
+        .eq("id", roomId)
+        .maybeSingle();
+
+      if (roomError || !roomData) throw new Error("Room not found");
 
       setRoom(roomData);
-      setPlayers(playersData);
+
+      // 加载房间玩家列表
+      const { data: playersData, error: playersError } = await supabase
+        .from("room_players")
+        .select("*")
+        .eq("room_id", roomId);
+
+      if (playersError) {
+        console.error("Failed to load players:", playersError);
+      } else {
+        setPlayers(playersData || []);
+      }
     } catch (err: any) {
       const msg = err.message || "Failed to load room";
       setError(msg);
