@@ -136,7 +136,21 @@ export function useRoom(userId: string | null): UseRoomReturn {
 
       if (playerError) throw playerError;
 
+      // 设置房间信息和玩家列表
       setRoom(newRoom);
+      setPlayers([
+        {
+          id: "", // 暂时空，实际会在订阅时更新
+          room_id: newRoom.id,
+          user_id: userId,
+          player_index: 0,
+          player_name: "Host",
+          avatar: "👤",
+          color_index: 0,
+          position: -1,
+          lap: 0,
+        },
+      ]);
       return newRoom.id;
     } catch (err: any) {
       const msg = err.message || "Failed to create room";
