@@ -8,7 +8,7 @@
 -- 存储游戏房间的基本信息
 CREATE TABLE IF NOT EXISTS rooms (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  room_code TEXT UNIQUE NOT NULL, -- 6位房间码：000000-999999
+  room_code TEXT UNIQUE NOT NULL, -- 6位房间码（2位数字+4位字母/数字，避免O/I/L）例：42ABCD
   creator_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   state TEXT DEFAULT 'waiting', -- waiting | playing | finished
   max_players INT DEFAULT 4,
@@ -184,12 +184,77 @@ CREATE INDEX IF NOT EXISTS idx_room_players_user_id ON room_players(user_id);
 CREATE INDEX IF NOT EXISTS idx_room_games_room_id ON room_games(room_id);
 
 -- =============================================
--- 自动清理过期房间的函数（可选，需要定期运行）
+-- 自动清理过期和空房间的函数
 -- =============================================
 
+-- 1. 清理过期房间和空房间
 CREATE OR REPLACE FUNCTION cleanup_expired_rooms()
 RETURNS void AS $$
 BEGIN
+  -- 删除过期房间（7天未活动）
   DELETE FROM rooms WHERE expires_at < NOW();
+  
+  -- 删除所有玩家都离开的房间（级联删除 room_games）
+  DELETE FROM rooms 
+  WHERE id IN (
+    SELECT r.id FROM rooms r
+    WHERE NOT EXISTS (
+      SELECT 1 FROM room_players WHERE room_id = r.id
+    )
+  );
 END;
 $$ LANGUAGE plpgsql;
+
+-- 2. 玩家离开后的自动清理触发器
+CREATE OR REPLACE FUNCTION cleanup_empty_room_after_player_delete()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- 当玩家离开房间时，检查房间是否已无玩家
+  IF NOT EXISTS (SELECT 1 FROM room_players WHERE room_id = OLD.room_id) THEN
+    -- 房间无玩家，删除房间及其关联的 room_games 记录
+    DELETE FROM room_games WHERE room_id = OLD.room_id;
+    DELETE FROM rooms WHERE id = OLD.room_id;
+  ELSE
+    -- 房间还有玩家，更新 current_players 计数
+    UPDATE rooms 
+    SET current_players = (SELECT COUNT(*) FROM room_players WHERE room_id = OLD.room_id)
+    WHERE id = OLD.room_id;
+  END IF;
+  RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 3. 创建触发器：当删除 room_players 时触发清理
+DROP TRIGGER IF EXISTS cleanup_empty_room_trigger ON room_players;
+CREATE TRIGGER cleanup_empty_room_trigger
+AFTER DELETE ON room_players
+FOR EACH ROW
+EXECUTE FUNCTION cleanup_empty_room_after_player_delete();
+
+-- 4. 在创建 room_games 时自动更新 room 的 expires_at（延长房间生命周期）
+CREATE OR REPLACE FUNCTION extend_room_expiry_on_game_start()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- 游戏开始时，延长房间过期时间到 24 小时后
+  UPDATE rooms 
+  SET expires_at = NOW() + INTERVAL '24 hours'
+  WHERE id = NEW.room_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 5. 创建触发器：当创建 room_games 时触发
+DROP TRIGGER IF EXISTS extend_room_expiry_trigger ON room_games;
+CREATE TRIGGER extend_room_expiry_trigger
+AFTER INSERT ON room_games
+FOR EACH ROW
+EXECUTE FUNCTION extend_room_expiry_on_game_start();
+
+-- =============================================
+-- 可选：用 pg_cron 定期执行清理（企业版 Supabase 支持）
+-- 如果你的 Supabase 版本不支持 pg_cron，可以手动调用以下函数
+-- =============================================
+-- SELECT cleanup_expired_rooms(); -- 手动执行
+
+-- 每天凌晨1点执行一次清理（需要 pg_cron 扩展）
+-- SELECT cron.schedule('cleanup-rooms', '0 1 * * *', 'SELECT cleanup_expired_rooms();');

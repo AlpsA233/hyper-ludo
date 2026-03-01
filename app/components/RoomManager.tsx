@@ -43,9 +43,9 @@ export default function RoomManager({
         event_density: 40,
       });
 
-      // 获取房间码（需要从数据库查询）
-      // 这里假设创建成功后返回roomId，需要在useRoom中修改
-      setCreatedRoomCode("000001"); // 临时
+      // 重新加载房间数据以获取房间码
+      // 这里可以直接从 useRoom 的 room 状态获取
+      // 为了简化，我们让父组件重新传递房间码
       onRoomCreated?.(roomId);
     } catch (err: any) {
       setError(err.message || "Failed to create room");
@@ -68,8 +68,8 @@ export default function RoomManager({
     setError(null);
 
     try {
-      await joinRoom(roomCode, playerName, "👤");
-      onRoomJoined?.(roomCode);
+      const roomId = await joinRoom(roomCode, playerName, "👤");
+      onRoomJoined?.(roomId); // 传递 roomId 而不是 roomCode
     } catch (err: any) {
       setError(err.message || "Failed to join room");
     } finally {

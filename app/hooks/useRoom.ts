@@ -50,7 +50,7 @@ interface UseRoomReturn {
     roomCode: string,
     playerName: string,
     avatar: string,
-  ) => Promise<void>;
+  ) => Promise<string>; // 返回roomId
   leaveRoom: () => Promise<void>;
   startGame: () => Promise<void>;
   updatePlayerPosition: (
@@ -75,9 +75,20 @@ export function useRoom(userId: string | null): UseRoomReturn {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 生成房间码（6位数字）
+  // 生成房间码（6位：2位数字 + 4位字母/数字，避免 O/I/L）
+  // 例如：42ABCD, 17XYZ9
   const generateRoomCode = (): string => {
-    return String(Math.floor(Math.random() * 1000000)).padStart(6, "0");
+    const chars = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"; // 避免 0/1/I/L/O
+    const nums = "23456789";
+    let code = "";
+    // 2位数字
+    code += nums[Math.floor(Math.random() * nums.length)];
+    code += nums[Math.floor(Math.random() * nums.length)];
+    // 4位字母/数字
+    for (let i = 0; i < 4; i++) {
+      code += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return code;
   };
 
   // 创建房间
@@ -161,12 +172,12 @@ export function useRoom(userId: string | null): UseRoomReturn {
     }
   };
 
-  // 加入房间
+  // 加入房间，返回房间ID
   const joinRoom = async (
     roomCode: string,
     playerName: string,
     avatar: string,
-  ): Promise<void> => {
+  ): Promise<string> => {
     if (!userId) throw new Error("User not logged in");
 
     setLoading(true);
@@ -223,6 +234,7 @@ export function useRoom(userId: string | null): UseRoomReturn {
         .eq("id", targetRoom.id);
 
       setRoom(targetRoom);
+      return targetRoom.id; // 返回房间ID
     } catch (err: any) {
       const msg = err.message || "Failed to join room";
       setError(msg);
@@ -232,33 +244,20 @@ export function useRoom(userId: string | null): UseRoomReturn {
     }
   };
 
-  // 离开房间
+  // 离开房间（触发器会自动删除空房间）
   const leaveRoom = async (): Promise<void> => {
     if (!userId || !room) return;
 
     try {
       // 删除玩家记录
+      // 触发器 cleanup_empty_room_after_player_delete 会自动：
+      // 1. 如果房间无玩家了，删除房间及其 room_games
+      // 2. 如果房间还有玩家，更新 current_players 计数
       await supabase
         .from("room_players")
         .delete()
         .eq("room_id", room.id)
         .eq("user_id", userId);
-
-      // 如果创建者离开，删除整个房间
-      if (room.creator_id === userId) {
-        await supabase.from("rooms").delete().eq("id", room.id);
-      } else {
-        // 更新房间玩家数量
-        const { data: remaining } = await supabase
-          .from("room_players")
-          .select("id", { count: "exact" })
-          .eq("room_id", room.id);
-
-        await supabase
-          .from("rooms")
-          .update({ current_players: remaining?.length || 0 })
-          .eq("id", room.id);
-      }
 
       setRoom(null);
       setPlayers([]);
@@ -388,7 +387,11 @@ export function useRoom(userId: string | null): UseRoomReturn {
           filter: `room_id=eq.${roomId}`,
         },
         (payload: any) => {
-          if (payload.new) {
+          if (
+            payload.eventType === "INSERT" ||
+            payload.eventType === "UPDATE"
+          ) {
+            // 新增或更新玩家
             setPlayers((prev) => {
               const existing = prev.findIndex((p) => p.id === payload.new.id);
               if (existing >= 0) {
@@ -398,6 +401,9 @@ export function useRoom(userId: string | null): UseRoomReturn {
               }
               return [...prev, payload.new];
             });
+          } else if (payload.eventType === "DELETE") {
+            // 删除玩家（玩家退出房间）
+            setPlayers((prev) => prev.filter((p) => p.id !== payload.old.id));
           }
         },
       )
