@@ -53,19 +53,48 @@ npm run dev
 
 ## 🚀 部署到 Vercel
 
-环境变量已自动同步，无需额外配置。
+### 必须配置 Supabase Site URL
+
+部署后，必须修改 Supabase 的 Site URL，否则登录后会跳转到 localhost:3000。
+
+**操作步骤：**
+
+1. 访问 [Supabase Settings - Authentication](https://supabase.com/dashboard/project/qjirnckllkqsrnicrnaz/settings/auth)
+
+2. **修改 Site URL**（必须）：
+   - 将 `http://localhost:3000` 改为你的 Vercel 域名
+   - 例如：`https://hyper-ludo.vercel.app`
+   - 点击 Save
+
+3. **添加 Redirect URLs**：
+   - 添加生产环境：`https://hyper-ludo.vercel.app/**`
+   - 保留开发环境：`http://localhost:3000/**`
+
+4. 环境变量已自动同步，无需额外配置。
 
 ## ⚠️ 注意事项
 
+### 常见问题：登录后跳转到 localhost:3000
+
+**症状：** Vercel 部署后，Google/GitHub 登录成功后跳转到 `http://localhost:3000`
+
+**原因：** Supabase Site URL 还是默认的 localhost:3000
+
+**解决：** 按照上面"部署到 Vercel"部分修改 Site URL 为实际域名
+
+---
+
 1. **开发环境（localhost）：**
-   - 需要在 Google/GitHub OAuth 应用中添加 `http://localhost:3000` 到授权 URL
+   - Supabase Redirect URLs 需包含：`http://localhost:3000/**`
+   - 本地测试时 Site URL 可以设为 localhost
 
 2. **生产环境：**
-   - 更新 OAuth 应用的授权 URL 为实际域名
-   - 例如：`https://hyper-ludo.vercel.app`
+   - Supabase Site URL 必须设为 Vercel 域名
+   - Supabase Redirect URLs 需包含：`https://your-domain.vercel.app/**`
 
 3. **Redirect URI 必须完全匹配：**
    - Supabase Callback: `https://qjirnckllkqsrnicrnaz.supabase.co/auth/v1/callback`
+   - 这个回调 URL 不需要修改，在所有环境通用
    - 不要漏掉 `/auth/v1/callback`
 
 ## 📊 当前状态
