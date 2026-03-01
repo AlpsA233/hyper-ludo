@@ -306,6 +306,30 @@ export function useRoom(userId: string | null): UseRoomReturn {
   const subscribe = useCallback((roomId: string): (() => void) => {
     const unsubscribers: Array<() => void> = [];
 
+    // 订阅房间状态变化（rooms 表）
+    const roomChannel = supabase
+      .channel(`rooms:${roomId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "rooms",
+          filter: `id=eq.${roomId}`,
+        },
+        (payload: any) => {
+          console.log("📍 Realtime: rooms 表更新", payload.new);
+          if (payload.new) {
+            setRoom(payload.new);
+          }
+        },
+      )
+      .subscribe();
+
+    unsubscribers.push(() => {
+      roomChannel.unsubscribe();
+    });
+
     // 订阅房间玩家变化
     const playersChannel = supabase
       .channel(`room_players:${roomId}`)

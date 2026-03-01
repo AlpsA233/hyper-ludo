@@ -43,13 +43,28 @@ export default function RoomLobby({
 
   // 加载房间数据和订阅实时更新
   useEffect(() => {
+    console.log("📍 RoomLobby: 加载房间数据", roomId);
     loadRoom(roomId);
     const unsubscribe = subscribe(roomId);
     return unsubscribe;
   }, [roomId]);
 
+  // 监听房间对象变化
+  useEffect(() => {
+    console.log("📍 RoomLobby: room 对象更新", {
+      roomId: room?.id,
+      state: room?.state,
+      room: room,
+    });
+  }, [room]);
+
   // 监听房间状态变化：当游戏开始时自动跳转
   useEffect(() => {
+    console.log("📍 RoomLobby: 检查房间状态", {
+      roomExists: !!room,
+      state: room?.state,
+      shouldStart: room && room.state === "playing",
+    });
     if (room && room.state === "playing") {
       console.log("🎮 Room state changed to PLAYING, triggering onStartGame");
       onStartGameRef.current?.();
