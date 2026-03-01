@@ -961,16 +961,16 @@ export default function App() {
                 // 初始化游戏玩家数据
                 if (roomPlayers && roomPlayers.length > 0) {
                   const gamePlayers: Player[] = roomPlayers.map((rp) => ({
-                    id: rp.user_id,
-                    name: rp.player_name,
-                    avatar: rp.avatar,
-                    colorIndex: rp.color_index,
-                    position: rp.position >= 0 ? rp.position : -1,
-                    lap: rp.lap,
-                    startPos: 0, // 每个玩家起点为0
-                    cards: [],
+                    id: rp.player_index,
+                    color: COLORS[rp.color_index],
+                    pos: -1,
+                    lap: 0,
+                    startPos: 0,
                     shield: false,
                     skipTurn: false,
+                    cards: [],
+                    avatar: rp.avatar,
+                    name: rp.player_name,
                   }));
                   setPlayers(gamePlayers);
                 }
