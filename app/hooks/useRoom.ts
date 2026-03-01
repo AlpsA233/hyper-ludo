@@ -342,11 +342,18 @@ export function useRoom(userId: string | null): UseRoomReturn {
           filter: `room_id=eq.${roomId}`,
         },
         (payload: any) => {
+          console.log("📍 Realtime: room_players 表事件", {
+            eventType: payload.eventType,
+            new: payload.new,
+            old: payload.old,
+          });
+
           if (
             payload.eventType === "INSERT" ||
             payload.eventType === "UPDATE"
           ) {
             // 新增或更新玩家
+            console.log("➕ 添加或更新玩家:", payload.new.player_name);
             setPlayers((prev) => {
               const existing = prev.findIndex((p) => p.id === payload.new.id);
               if (existing >= 0) {
@@ -358,6 +365,7 @@ export function useRoom(userId: string | null): UseRoomReturn {
             });
           } else if (payload.eventType === "DELETE") {
             // 删除玩家（玩家退出房间）
+            console.log("➖ 删除玩家:", payload.old.player_name);
             setPlayers((prev) => prev.filter((p) => p.id !== payload.old.id));
           }
         },

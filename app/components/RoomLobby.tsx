@@ -58,6 +58,18 @@ export default function RoomLobby({
     });
   }, [room]);
 
+  // 监听玩家列表变化
+  useEffect(() => {
+    console.log("👥 RoomLobby: 玩家列表更新", {
+      count: players.length,
+      players: players.map((p) => ({
+        id: p.id,
+        name: p.player_name,
+        index: p.player_index,
+      })),
+    });
+  }, [players]);
+
   // 监听房间状态变化：当游戏开始时自动跳转
   useEffect(() => {
     console.log("📍 RoomLobby: 检查房间状态", {

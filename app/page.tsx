@@ -380,6 +380,22 @@ export default function App() {
     }
   }, [gameState, isMultiplayer, isMoving, isRolling]);
 
+  // 多人游戏：同步房间玩家数据到游戏显示（用于左侧玩家部分）
+  useEffect(() => {
+    if (!isMultiplayer || !roomPlayers || roomPlayers.length === 0) return;
+
+    // 仅在游戏进行中时同步玩家信息
+    if (phase === "playing") {
+      console.log(
+        "👥 同步房间玩家数据到游戏显示:",
+        roomPlayers.length,
+        "位玩家",
+      );
+      // 这里不更新 players，因为 players 是游戏逻辑中的玩家状态
+      // 而是确保 PlayerSidebar 显示的数据来自正确的来源
+    }
+  }, [roomPlayers, isMultiplayer, phase]);
+
   const totalSteps = useMemo(() => numPlayers * 10, [numPlayers]);
   const center = { x: 400, y: 400 };
 
@@ -1073,8 +1089,23 @@ export default function App() {
             onStartGame={async () => {
               try {
                 await startMultiplayerGame();
+
+                // 使用房间配置初始化游戏
+                const numPlayersFromRoom = room?.num_players || numPlayers;
+                if (room) {
+                  setNumPlayers(room.num_players);
+                  setDiceCount(room.dice_count);
+                  setLapsToWin(room.laps_to_win);
+                  setInitialCards(room.initial_cards);
+                  setEventDensity(room.event_density);
+                }
+
                 // 初始化游戏玩家数据
                 if (roomPlayers && roomPlayers.length > 0) {
+                  console.log(
+                    "👥 使用房间玩家数据初始化游戏:",
+                    roomPlayers.length,
+                  );
                   const gamePlayers: Player[] = roomPlayers.map((rp) => ({
                     id: rp.player_index,
                     color: COLORS[rp.color_index],
@@ -1088,15 +1119,29 @@ export default function App() {
                     name: rp.player_name,
                   }));
                   setPlayers(gamePlayers);
+                } else {
+                  // 备用：如果没有房间玩家数据，使用配置的玩家数创建默认玩家
+                  console.log(
+                    "👥 使用默认玩家数据初始化游戏:",
+                    numPlayersFromRoom,
+                  );
+                  const defaultPlayers: Player[] = Array.from({
+                    length: numPlayersFromRoom,
+                  }).map((_, i) => ({
+                    id: i,
+                    color: COLORS[i],
+                    pos: -1,
+                    lap: 0,
+                    startPos: 0,
+                    shield: false,
+                    skipTurn: false,
+                    cards: [],
+                    avatar: ["🔵", "🟣", "🟡", "🟢"][i] || "🔵",
+                    name: `Player ${i + 1}`,
+                  }));
+                  setPlayers(defaultPlayers);
                 }
-                // 使用房间配置初始化游戏
-                if (room) {
-                  setNumPlayers(room.num_players);
-                  setDiceCount(room.dice_count);
-                  setLapsToWin(room.laps_to_win);
-                  setInitialCards(room.initial_cards);
-                  setEventDensity(room.event_density);
-                }
+
                 setPhase("playing");
               } catch (error) {
                 console.error("Failed to start game:", error);
@@ -1244,7 +1289,7 @@ export default function App() {
                 t={t.game}
               />
             ) : (
-              <div className="w-full max-h-[20vh] flex-shrink-0 overflow-x-auto">
+              <div className="w-full max-h-[30vh] flex-shrink-0 overflow-y-auto overflow-x-hidden">
                 <PlayerSidebar
                   players={players}
                   turn={turn}
