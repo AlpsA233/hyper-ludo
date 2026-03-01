@@ -28,6 +28,9 @@ interface DiceControlProps {
   isShakeSupported?: boolean;
   isShakePermissionGranted?: boolean;
   requestShakePermission?: () => Promise<boolean>;
+  // 多人游戏支持
+  isMultiplayer?: boolean;
+  currentPlayerIndex?: number | null;
 }
 
 export default function DiceControl({
@@ -48,6 +51,8 @@ export default function DiceControl({
   isShakeSupported = false,
   isShakePermissionGranted = false,
   requestShakePermission,
+  isMultiplayer = false,
+  currentPlayerIndex = null,
 }: DiceControlProps) {
   // 生成单个骰子面的函数
   const renderDiceFaces = () => {
@@ -118,6 +123,13 @@ export default function DiceControl({
         {/* 提示文字和授权按钮 */}
         {!isRolling && !isMoving && (
           <div className="text-center space-y-2">
+            {/* 多人游戏权限检查 */}
+            {isMultiplayer && currentPlayerIndex !== turn && (
+              <p className="text-sm text-yellow-400 font-bold bg-yellow-500/20 px-4 py-2 rounded-lg border border-yellow-500/30">
+                ⏳ 等待玩家 {turn + 1} 掷骰...
+              </p>
+            )}
+
             {!isPC &&
             isShakeSupported &&
             !isShakePermissionGranted &&
@@ -126,20 +138,21 @@ export default function DiceControl({
                 onClick={async () => {
                   await requestShakePermission();
                 }}
-                className="px-6 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 rounded-lg text-sm font-bold text-cyan-400 transition-all shadow-lg">
+                disabled={isMultiplayer && currentPlayerIndex !== turn}
+                className="px-6 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 rounded-lg text-sm font-bold text-cyan-400 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
                 🤳 启用摇一摇功能
               </button>
             ) : !isPC && isShakeSupported && isShakePermissionGranted ? (
               <p className="text-xs text-gray-400 animate-pulse">
-                {t.shakeToRoll || "摇一摇掷骰子"}
+                {isMultiplayer && currentPlayerIndex !== turn
+                  ? ""
+                  : t.shakeToRoll || "摇一摇掷骰子"}
               </p>
             ) : isPC ? (
               <p className="text-xs text-gray-400">
-                点击骰子或按{" "}
-                <kbd className="px-2 py-1 bg-white/10 rounded border border-white/20 font-mono text-xs">
-                  Space
-                </kbd>{" "}
-                掷骰子
+                {isMultiplayer && currentPlayerIndex !== turn
+                  ? ""
+                  : `点击骰子或按 Space 掷骰子`}
               </p>
             ) : null}
           </div>

@@ -128,18 +128,27 @@ export default function App() {
     DEFAULT_EVENT_DB,
   );
 
-  // 房间管理（Phase 3.1）
+  // 房间管理（Phase 3.1 + 多人游戏状态同步）
   const {
     room,
     players: roomPlayers,
     isCreator,
+    gameState,
     createRoom,
     joinRoom,
     leaveRoom,
     startGame: startMultiplayerGame,
+    rollDice: roomRollDice,
+    subscribe,
   } = useRoom(user?.id || null);
 
   const [roomId, setRoomId] = useState<string | null>(null);
+
+  // 多人游戏状态跟踪
+  const [isMultiplayer, setIsMultiplayer] = useState(false);
+  const [currentPlayerIndex, setCurrentPlayerIndex] = useState<number | null>(
+    null,
+  );
 
   // 检测是否为PC端（屏幕宽度 >= 1024px）
   const [isPC, setIsPC] = useState(false);
@@ -320,6 +329,56 @@ export default function App() {
 
     return () => clearInterval(interval);
   }, [cardEffectDisplay]);
+
+  // 多人游戏：订阅房间 Realtime 更新
+  useEffect(() => {
+    if (!roomId) return;
+
+    console.log("🔌 订阅房间 Realtime:", roomId);
+    setIsMultiplayer(true);
+
+    // 建立 Realtime 订阅
+    const unsubscribe = subscribe(roomId);
+
+    // 计算当前玩家的索引（基于 roomPlayers 中的顺序）
+    if (room && roomPlayers.length > 0 && user?.id) {
+      const myIndex = roomPlayers.findIndex((p) => p.user_id === user.id);
+      setCurrentPlayerIndex(myIndex >= 0 ? myIndex : null);
+      console.log("👤 当前玩家索引:", myIndex);
+    }
+
+    return () => {
+      console.log("❌ 取消 Realtime 订阅:", roomId);
+      unsubscribe();
+    };
+  }, [roomId, subscribe, room, roomPlayers, user?.id]);
+
+  // 多人游戏：当 gameState 变化时，同步本地状态
+  useEffect(() => {
+    if (!gameState || !isMultiplayer) return;
+
+    console.log("🎮 游戏状态更新:", gameState);
+
+    // 更新 turn
+    if (gameState.turn !== undefined) {
+      setTurn(gameState.turn);
+    }
+
+    // 更新掷骰结果
+    if (gameState.dice_results) {
+      setDiceResults(gameState.dice_results);
+    }
+
+    if (gameState.dice_value !== undefined) {
+      setDiceValue(gameState.dice_value);
+    }
+
+    // 如果掷骰完成，更新 phase 为 "moving"
+    if (gameState.phase === "moving" && !isMoving && !isRolling) {
+      // 掷骰已完成，可以显示动画或处理
+      console.log("🎲 掷骰数值:", gameState.dice_value, gameState.dice_results);
+    }
+  }, [gameState, isMultiplayer, isMoving, isRolling]);
 
   const totalSteps = useMemo(() => numPlayers * 10, [numPlayers]);
   const center = { x: 400, y: 400 };
@@ -506,8 +565,21 @@ export default function App() {
     }
   };
 
-  const handleRollDice = () => {
+  const handleRollDice = async () => {
     if (isRolling || isMoving) return;
+
+    // 多人游戏权限检查
+    if (isMultiplayer && currentPlayerIndex !== turn) {
+      console.warn(
+        "❌ 不是你的回合。当前玩家:",
+        turn,
+        "你的索引:",
+        currentPlayerIndex,
+      );
+      addLog(`等待玩家 ${turn + 1} 掷骰子...`);
+      return;
+    }
+
     if (players[turn].skipTurn) {
       addLog(`Player ${turn + 1} skipped (turn frozen)`);
       setPlayers((prev) =>
@@ -523,22 +595,78 @@ export default function App() {
       setHasUsedCard(false);
       return;
     }
+
     setIsRolling(true);
     setDiceResults([]); // 清除上一次的掷骰结果
-    if ((window as any).gsap) {
-      // 1. 生成所有骰子的目标值
-      const results: number[] = Array.from({ length: diceCount }).map(
-        () => Math.floor(Math.random() * 6) + 1,
-      );
-      const totalValue = results.reduce((a, b) => a + b, 0);
 
-      // 2. 对每个骰子进行动画
+    try {
+      // 多人游戏：调用服务器 API 生成掷骰结果
+      if (isMultiplayer && room) {
+        console.log("🎲 多人模式：调用 rollDice API");
+        const { diceValue: apiDiceValue, diceResults: apiDiceResults } =
+          await roomRollDice(diceCount);
+        console.log("📡 服务器掷骰结果:", apiDiceValue, apiDiceResults);
+
+        // 使用服务器返回的结果显示动画
+        if ((window as any).gsap) {
+          await animateDiceRoll(apiDiceResults);
+          setDiceValue(apiDiceValue);
+          setDiceResults(apiDiceResults);
+
+          const resultString =
+            diceCount === 1
+              ? `${apiDiceValue}`
+              : `${apiDiceResults.join(", ")} (总计: ${apiDiceValue})`;
+          addLog(`Player ${turn + 1} rolled ${resultString}`);
+
+          setIsRolling(false);
+          handleMove(apiDiceValue);
+        }
+      } else {
+        // 单人游戏：本地生成掷骰结果
+        console.log("🎲 单人模式：本地生成掷骰结果");
+        const results: number[] = Array.from({ length: diceCount }).map(
+          () => Math.floor(Math.random() * 6) + 1,
+        );
+        const totalValue = results.reduce((a, b) => a + b, 0);
+
+        if ((window as any).gsap) {
+          await animateDiceRoll(results);
+          setDiceValue(totalValue);
+          setDiceResults(results);
+
+          const resultString =
+            diceCount === 1
+              ? `${totalValue}`
+              : `${results.join(", ")} (总计: ${totalValue})`;
+          addLog(`Player ${turn + 1} rolled ${resultString}`);
+
+          setIsRolling(false);
+          handleMove(totalValue);
+        }
+      }
+    } catch (error) {
+      console.error("❌ 掷骰子失败:", error);
+      addLog("❌ 掷骰子失败，请重试");
+      setIsRolling(false);
+    }
+  };
+
+  // 骰子动画辅助函数
+  const animateDiceRoll = (results: number[]): Promise<void> => {
+    return new Promise<void>((resolve) => {
+      if (!(window as any).gsap) {
+        resolve();
+        return;
+      }
+
+      // 对每个骰子进行动画
       const animationPromises = diceRefs.current
         .slice(0, diceCount)
         .map((diceEl, idx) => {
-          return new Promise<void>((resolve) => {
+          return new Promise<void>((innerResolve) => {
             if (!diceEl) {
-              resolve();
+              innerResolve();
               return;
             }
 
@@ -548,9 +676,9 @@ export default function App() {
               rotationY: "random(720, 1080)",
               duration: 1,
               ease: "power2.in",
-              delay: idx * 0.1, // 每个骰子延迟一点时间
+              delay: idx * 0.1,
               onComplete: () => {
-                // 3. 停留在目标值
+                // 停留在目标值
                 const displayValue = results[idx];
 
                 // Map value to face rotation
@@ -573,7 +701,6 @@ export default function App() {
                   "rotationY",
                 );
 
-                // Calculate nearest multiple of 360 to keep spinning in same direction
                 const nextX = Math.round(currentX / 360) * 360 + target.x;
                 const nextY = Math.round(currentY / 360) * 360 + target.y;
 
@@ -583,7 +710,7 @@ export default function App() {
                   duration: 1,
                   ease: "back.out(1.7)",
                   onComplete: () => {
-                    resolve();
+                    innerResolve();
                   },
                 });
               },
@@ -591,22 +718,10 @@ export default function App() {
           });
         });
 
-      // 4. 等待所有骰子动画完成
       Promise.all(animationPromises).then(() => {
-        setDiceValue(totalValue);
-        setDiceResults(results);
-
-        // Log each dice result
-        const resultString =
-          diceCount === 1
-            ? `${totalValue}`
-            : `${results.join(", ")} (总计: ${totalValue})`;
-        addLog(`Player ${turn + 1} rolled ${resultString}`);
-
-        setIsRolling(false);
-        handleMove(totalValue);
+        resolve();
       });
-    }
+    });
   };
 
   /**
@@ -1188,6 +1303,8 @@ export default function App() {
                 isShakeSupported={isShakeSupported}
                 isShakePermissionGranted={isShakePermissionGranted}
                 requestShakePermission={requestShakePermission}
+                isMultiplayer={isMultiplayer}
+                currentPlayerIndex={currentPlayerIndex}
               />
             </div>
 
