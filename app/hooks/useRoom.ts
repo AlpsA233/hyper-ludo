@@ -101,7 +101,7 @@ export function useRoom(userId: string | null): UseRoomReturn {
           .from("rooms")
           .select("id")
           .eq("room_code", roomCode)
-          .single();
+          .maybeSingle();
         if (!existing) codeExists = false;
         else roomCode = generateRoomCode();
       }
@@ -163,7 +163,7 @@ export function useRoom(userId: string | null): UseRoomReturn {
         .from("rooms")
         .select("*")
         .eq("room_code", roomCode)
-        .single();
+        .maybeSingle();
 
       if (findError || !targetRoom) throw new Error("Room not found");
       if (targetRoom.state !== "waiting")
@@ -177,7 +177,7 @@ export function useRoom(userId: string | null): UseRoomReturn {
         .select("id")
         .eq("room_id", targetRoom.id)
         .eq("user_id", userId)
-        .single();
+        .maybeSingle();
 
       if (existing) throw new Error("Already in this room");
 
