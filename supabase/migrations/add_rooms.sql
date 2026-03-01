@@ -154,6 +154,15 @@ CREATE POLICY "Room players can view game state"
     )
   );
 
+-- 简化政策：直接通过房间ID检查（Realtime友好）
+CREATE POLICY "Room players can view game state by room"
+  ON room_games FOR SELECT
+  USING (
+    room_id IN (
+      SELECT room_id FROM room_players WHERE user_id = auth.uid()
+    )
+  );
+
 CREATE POLICY "Room creator can create game state"
   ON room_games FOR INSERT
   WITH CHECK (

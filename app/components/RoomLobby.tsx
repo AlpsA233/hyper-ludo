@@ -42,6 +42,13 @@ export default function RoomLobby({
     return unsubscribe;
   }, [roomId]);
 
+  // 监听房间状态变化：当游戏开始时自动跳转
+  useEffect(() => {
+    if (room && room.state === "playing") {
+      onStartGame?.();
+    }
+  }, [room?.state, onStartGame]);
+
   const handleStartGame = async () => {
     setLoading(true);
     try {
