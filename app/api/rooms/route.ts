@@ -168,7 +168,7 @@ async function startGame(roomId: string, userId: string) {
   // 验证用户是房间创建者
   const { data: room, error: roomError } = await supabaseAdmin
     .from("rooms")
-    .select("creator_id, state")
+    .select("creator_id, state, num_players, event_density, total_steps")
     .eq("id", roomId)
     .single();
 
@@ -184,6 +184,29 @@ async function startGame(roomId: string, userId: string) {
     throw new Error("Game already started");
   }
 
+  // 🔧 在服务器端生成boardTiles，确保所有玩家看到相同的棋盘
+  const totalSteps = room.total_steps || 40;
+  const numPlayers = room.num_players || 2;
+  const eventDensity = room.event_density || 40;
+
+  const boardTiles = Array.from({ length: totalSteps }).map((_, i) => {
+    // 起始点附近保持安全
+    if (i % (totalSteps / numPlayers) < 2) {
+      return { id: "SAFE" };
+    }
+    // 根据事件密度生成CUSTOM格子
+    return Math.random() * 100 < eventDensity
+      ? { id: "CUSTOM" }
+      : { id: "SAFE" };
+  });
+
+  console.log("🎲 服务器生成棋盘瓷砖:", {
+    totalSteps,
+    numPlayers,
+    eventDensity,
+    customTiles: boardTiles.filter((t) => t.id === "CUSTOM").length,
+  });
+
   // 创建游戏状态记录
   const { data: existingGame } = await supabaseAdmin
     .from("room_games")
@@ -197,6 +220,7 @@ async function startGame(roomId: string, userId: string) {
       turn: 0,
       phase: "playing",
       logs: [],
+      board_tiles: boardTiles,
     });
   } else {
     // 重置游戏状态
@@ -210,9 +234,13 @@ async function startGame(roomId: string, userId: string) {
         active_event: null,
         active_card: null,
         logs: [],
+        board_tiles: boardTiles,
       })
       .eq("room_id", roomId);
   }
+
+  // 返回room和boardTiles给客户端
+  return { room, boardTiles };
 
   // 更新房间状态
   await supabaseAdmin

@@ -461,6 +461,12 @@ export function useRoom(userId: string | null): UseRoomReturn {
     });
 
     // 订阅房间游戏状态变化
+    console.log("🎮 [Realtime] 建立 room_games 订阅", {
+      roomId,
+      channelName: `room_games:${roomId}`,
+      filter: `room_id=eq.${roomId}`,
+    });
+
     const gameStateChannel = supabase
       .channel(`room_games:${roomId}`)
       .on(
@@ -472,18 +478,41 @@ export function useRoom(userId: string | null): UseRoomReturn {
           filter: `room_id=eq.${roomId}`,
         },
         (payload: any) => {
+          console.log("🎮 [Realtime] 收到 room_games 事件", {
+            eventType: payload.eventType,
+            roomId,
+            payload: payload,
+            newData: payload.new,
+            oldData: payload.old,
+          });
+
           if (
             payload.eventType === "INSERT" ||
             payload.eventType === "UPDATE"
           ) {
+            console.log("🎮 [Realtime] 更新游戏状态", {
+              eventType: payload.eventType,
+              newGameState: payload.new,
+            });
             // 更新游戏状态
             setGameState(payload.new);
+          } else {
+            console.log("🎮 [Realtime] 忽略事件类型", {
+              eventType: payload.eventType,
+            });
           }
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("🎮 [Realtime] room_games 订阅状态变化", {
+          roomId,
+          status,
+          channelName: `room_games:${roomId}`,
+        });
+      });
 
     unsubscribers.push(() => {
+      console.log("🎮 [Realtime] 取消 room_games 订阅", { roomId });
       gameStateChannel.unsubscribe();
     });
 

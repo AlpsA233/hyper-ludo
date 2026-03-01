@@ -365,16 +365,27 @@ export default function App() {
   useEffect(() => {
     if (!gameState || !isMultiplayer) return;
 
-    console.log("🎮 Realtime 游戏状态更新:", {
-      turn: gameState.turn,
-      dice_value: gameState.dice_value,
-      dice_results: gameState.dice_results,
-      phase: gameState.phase,
+    // 📊 调试日志：显示完整的接收到的 gameState
+    console.log("🎮 [GameState Update] 接收到完整的 gameState:", {
+      ...gameState,
+      timestamp: new Date().toLocaleTimeString(),
+    });
+
+    console.log("🎮 [GameState Update] 当前本地状态对比:", {
+      remote_turn: gameState.turn,
+      local_turn: turn,
+      remote_dice_value: gameState.dice_value,
+      local_dice_value: diceValue,
+      remote_dice_results: gameState.dice_results,
+      local_dice_results: diceResults,
+      remote_phase: gameState.phase,
+      isMoving,
+      isRolling,
     });
 
     // 更新 turn
     if (gameState.turn !== undefined && gameState.turn !== turn) {
-      console.log(`🔄 回合更新: ${turn} → ${gameState.turn}`);
+      console.log(`🔄 [Turn Update] 回合更新: ${turn} → ${gameState.turn}`);
       setTurn(gameState.turn);
     }
 
@@ -383,7 +394,12 @@ export default function App() {
       if (
         JSON.stringify(gameState.dice_results) !== JSON.stringify(diceResults)
       ) {
-        console.log("🎲 骰子结果更新:", gameState.dice_results);
+        console.log(
+          "🎲 [Dice Results Update] 骰子结果更新:",
+          diceResults,
+          "→",
+          gameState.dice_results,
+        );
         setDiceResults(gameState.dice_results);
       }
     }
@@ -392,7 +408,12 @@ export default function App() {
       gameState.dice_value !== undefined &&
       gameState.dice_value !== diceValue
     ) {
-      console.log("🎲 骰子总值更新:", gameState.dice_value);
+      console.log(
+        "🎲 [Dice Value Update] 骰子总值更新:",
+        diceValue,
+        "→",
+        gameState.dice_value,
+      );
       setDiceValue(gameState.dice_value);
     }
 
@@ -400,7 +421,7 @@ export default function App() {
     if (gameState.phase === "moving" && !isMoving && !isRolling) {
       // 其他玩家看到掷骰结果，不再显示动画
       console.log(
-        "📍 其他玩家看到掷骰结果:",
+        "📍 [Phase Moving] 其他玩家看到掷骰结果:",
         gameState.dice_value,
         gameState.dice_results,
       );
@@ -408,15 +429,7 @@ export default function App() {
         `Player ${gameState.turn + 1} rolled ${gameState.dice_results?.length === 1 ? gameState.dice_value : gameState.dice_results?.join(", ") + ` (总计: ${gameState.dice_value})`}`,
       );
     }
-  }, [
-    gameState,
-    isMultiplayer,
-    isMoving,
-    isRolling,
-    turn,
-    diceValue,
-    diceResults,
-  ]);
+  }, [gameState, isMultiplayer, isMoving, isRolling]);
 
   // 多人游戏：同步房间玩家数据到游戏显示（用于左侧玩家部分）
   useEffect(() => {
@@ -1321,9 +1334,25 @@ export default function App() {
                   }
                 }
 
-                await startMultiplayerGame();
+                // 调用 API 的 startGame 来获取服务器生成的 boardTiles
+                const startGameResponse = await fetch("/api/rooms", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${(await supabase.auth.getSession())?.data.session?.access_token || ""}`,
+                  },
+                  body: JSON.stringify({
+                    action: "startGame",
+                    roomId,
+                  }),
+                }).then((res) => res.json());
 
-                // 注意：不要调用 loadRoom()，因为 startMultiplayerGame() 已经会更新房间状态
+                const serverBoardTiles = startGameResponse.boardTiles;
+                console.log("✅ 游戏启动 - 从API获取服务器生成的boardTiles:", {
+                  tilesCount: serverBoardTiles?.length || 0,
+                });
+
+                // 注意：不要调用 loadRoom()，因为 startGame API 已经会更新房间状态
                 // 避免Realtime订阅被中断和重新建立
                 // await loadRoom(roomId);
                 // await new Promise((resolve) => setTimeout(resolve, 100));
@@ -1436,30 +1465,9 @@ export default function App() {
                   setTurn(0);
                 }
 
-                // 🔧 关键：生成游戏棋盘瓷砖（使用房间的eventDensity）
-                const eventDensityValue =
-                  latestRoom?.event_density || eventDensity;
-                console.log(
-                  "🎲 生成棋盘瓷砖 - eventDensity:",
-                  eventDensityValue,
-                );
-
-                const tiles: BoardTile[] = Array.from({
-                  length: totalSteps,
-                }).map((_, i) => {
-                  // 起始点附近保持安全
-                  if (
-                    i % (totalSteps / (latestRoom?.num_players || numPlayers)) <
-                    2
-                  ) {
-                    return { id: "SAFE" as const };
-                  }
-                  // 根据事件密度生成CUSTOM格子
-                  return Math.random() * 100 < eventDensityValue
-                    ? { id: "CUSTOM" as const }
-                    : { id: "SAFE" as const };
-                });
-                setBoardTiles(tiles);
+                // 🔧 关键：使用API返回的服务器生成的boardTiles，确保两个客户端棋盘一致
+                console.log("🎲 使用服务器返回的棋盘瓷砖");
+                setBoardTiles(serverBoardTiles);
                 setEventCounts({});
 
                 setPhase("playing");
