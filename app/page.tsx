@@ -585,19 +585,30 @@ export default function App() {
     if (isRolling || isMoving) return;
 
     // 多人游戏权限检查
-    if (isMultiplayer && currentPlayerIndex !== turn) {
-      console.warn(
-        "❌ 不是你的回合。当前玩家:",
-        turn,
-        "你的索引:",
+    if (isMultiplayer) {
+      console.log("🎲 权限检查:", {
+        isMultiplayer,
         currentPlayerIndex,
-      );
-      addLog(`等待玩家 ${turn + 1} 掷骰子...`);
-      return;
-    }
+        turn,
+        isMyTurn: currentPlayerIndex === turn,
+      });
 
-    if (players[turn].skipTurn) {
-      addLog(`Player ${turn + 1} skipped (turn frozen)`);
+      if (currentPlayerIndex === null) {
+        console.warn("❌ 当前玩家索引未初始化");
+        addLog("❌ 游戏状态异常，请重新开始游戏");
+        return;
+      }
+
+      if (currentPlayerIndex !== turn) {
+        console.warn(
+          "❌ 不是你的回合。当前玩家:",
+          turn,
+          "你的索引:",
+          currentPlayerIndex,
+        );
+        addLog(`⏳ 等待玩家 ${turn + 1} 掷骰子...`);
+        return;
+      }
       setPlayers((prev) =>
         prev.map((p, i) => (i === turn ? { ...p, skipTurn: false } : p)),
       );
@@ -1106,19 +1117,37 @@ export default function App() {
                     "👥 使用房间玩家数据初始化游戏:",
                     roomPlayers.length,
                   );
-                  const gamePlayers: Player[] = roomPlayers.map((rp) => ({
-                    id: rp.player_index,
-                    color: COLORS[rp.color_index],
-                    pos: -1,
-                    lap: 0,
-                    startPos: 0,
-                    shield: false,
-                    skipTurn: false,
-                    cards: [],
-                    avatar: rp.avatar,
-                    name: rp.player_name,
-                  }));
+                  const gamePlayers: Player[] = roomPlayers
+                    .sort((a, b) => a.player_index - b.player_index) // 按索引排序确保顺序一致
+                    .map((rp) => ({
+                      id: rp.player_index,
+                      color: COLORS[rp.color_index % COLORS.length],
+                      pos: -1,
+                      lap: 0,
+                      startPos: 0,
+                      shield: false,
+                      skipTurn: false,
+                      cards: [],
+                      avatar:
+                        rp.avatar ||
+                        ["🔵", "🟣", "🟡", "🟢"][rp.player_index % 4],
+                      name: rp.player_name || `Player ${rp.player_index + 1}`,
+                    }));
                   setPlayers(gamePlayers);
+
+                  // 🔧 关键修复：重新计算当前玩家索引（确保权限检查正确）
+                  const myIndex = roomPlayers.findIndex(
+                    (p) => p.user_id === user?.id,
+                  );
+                  console.log("🎮 游戏开始 - 重新计算当前玩家索引:", {
+                    myIndex,
+                    userId: user?.id,
+                    totalPlayers: roomPlayers.length,
+                  });
+                  setCurrentPlayerIndex(myIndex >= 0 ? myIndex : null);
+
+                  // 确保游戏从玩家0开始
+                  setTurn(0);
                 } else {
                   // 备用：如果没有房间玩家数据，使用配置的玩家数创建默认玩家
                   console.log(
@@ -1140,6 +1169,7 @@ export default function App() {
                     name: `Player ${i + 1}`,
                   }));
                   setPlayers(defaultPlayers);
+                  setTurn(0);
                 }
 
                 setPhase("playing");

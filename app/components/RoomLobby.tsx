@@ -46,14 +46,14 @@ export default function RoomLobby({
     console.log("📍 RoomLobby: 加载房间数据", roomId);
     loadRoom(roomId);
     const unsubscribe = subscribe(roomId);
-    
+
     // 备用轮询机制：每2秒重新加载一次，确保看到新加入的玩家
     // 这是为了解决 Realtime 在某些情况下可能延迟的问题
     const pollInterval = setInterval(() => {
       console.log("🔄 RoomLobby: 定期查询最新房间数据（轮询）");
       loadRoom(roomId);
     }, 2000);
-    
+
     return () => {
       clearInterval(pollInterval);
       unsubscribe();
@@ -257,12 +257,17 @@ export default function RoomLobby({
               <>
                 <button
                   onClick={handleStartGame}
-                  disabled={loading || players.length === 0}
+                  disabled={loading || players.length < room.num_players}
+                  title={
+                    players.length < room.num_players
+                      ? `需要 ${room.num_players} 个玩家，当前 ${players.length} 个`
+                      : ""
+                  }
                   className="flex-1 py-3 px-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all">
                   <Play size={18} />
                   {loading
                     ? t.common?.starting || "Starting..."
-                    : t.common?.startGame || "Start Game"}
+                    : `${t.common?.startGame || "Start Game"} (${players.length}/${room.num_players})`}
                 </button>
                 <button
                   onClick={handleLeaveRoom}

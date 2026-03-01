@@ -438,7 +438,7 @@ export function useRoom(userId: string | null): UseRoomReturn {
       roomId,
       channels: ["rooms", "room_players", "room_games"],
     });
-    
+
     return () => {
       console.log("❌ 取消 Realtime 订阅", roomId);
       unsubscribers.forEach((unsub) => unsub());
