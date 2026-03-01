@@ -115,7 +115,7 @@ export default function GameBoard({
               : -1;
           const isCustom = tile?.id === "CUSTOM";
           const isStart = startPIdx >= 0;
-          const shouldShowAsEvent = eventDensity === 100 && !isStart;
+          const shouldShowAsEvent = isCustom;
 
           let fill = "rgba(255,255,255,0.25)";
           let radius = 3;

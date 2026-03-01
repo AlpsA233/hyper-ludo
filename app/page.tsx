@@ -668,7 +668,7 @@ export default function App() {
 
     try {
       // 多人游戏：调用服务器 API 生成掷骰结果
-      if (isMultiplayer && room) {
+      if (isMultiplayer && roomId) {
         console.log("🎲 多人模式：调用 rollDice API，diceCount:", diceCount);
         const { diceValue: apiDiceValue, diceResults: apiDiceResults } =
           await roomRollDice(diceCount);
@@ -885,10 +885,21 @@ export default function App() {
           if (allowedEvents.length === 0) {
             setIsMoving(false);
             // 🔧 多人游戏中，调用API来完成这个回合
-            if (isMultiplayer) {
+            if (isMultiplayer && roomId) {
               console.log("📤 调用endPlayerTurn来进入下一个玩家");
               try {
-                await endPlayerTurn();
+                // 使用 API 直接调用，而不是依赖 endPlayerTurn hook（它可能缺少 room 状态）
+                await fetch("/api/rooms", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${(await supabase.auth.getSession())?.data.session?.access_token || ""}`,
+                  },
+                  body: JSON.stringify({
+                    action: "endPlayerTurn",
+                    roomId,
+                  }),
+                }).then(res => res.json());
               } catch (err) {
                 console.error("❌ endPlayerTurn 失败:", err);
                 // fallback: 本地更新
@@ -925,23 +936,34 @@ export default function App() {
           setPhase("event");
         }, 400);
       } else {
-        setIsMoving(false);
-        // 🔧 多人游戏中，调用API来完成这个回合
-        if (isMultiplayer) {
-          console.log("📤 调用endPlayerTurn来进入下一个玩家");
-          try {
-            endPlayerTurn().catch((err) => {
+        setTimeout(async () => {
+          setIsMoving(false);
+          // 🔧 多人游戏中，调用API来完成这个回合
+          if (isMultiplayer && roomId) {
+            console.log("📤 调用endPlayerTurn来进入下一个玩家");
+            try {
+              // 使用 API 直接调用，而不是依赖 endPlayerTurn hook（它可能缺少 room 状态）
+              await fetch("/api/rooms", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${(await supabase.auth.getSession())?.data.session?.access_token || ""}`,
+                },
+                body: JSON.stringify({
+                  action: "endPlayerTurn",
+                  roomId,
+                }),
+              }).then(res => res.json());
+            } catch (err) {
               console.error("❌ endPlayerTurn 失败:", err);
               // fallback: 本地更新
               setTurn((turn + 1) % numPlayers);
-            });
-          } catch (err) {
-            console.error("❌ endPlayerTurn 异常:", err);
+            }
+          } else {
+            setTurn((turn + 1) % numPlayers);
+            setHasUsedCard(false);
           }
-        } else {
-          setTurn((turn + 1) % numPlayers);
-          setHasUsedCard(false);
-        }
+        }, 400);
       }
     });
   };
@@ -1233,6 +1255,11 @@ export default function App() {
                 }
 
                 await startMultiplayerGame();
+                
+                // 重新加载最新的房间数据到 useRoom 状态
+                await loadRoom(roomId);
+                // 再等一下，确保状态更新完成
+                await new Promise(resolve => setTimeout(resolve, 100));
 
                 // 使用房间配置初始化游戏
                 const numPlayersFromRoom =
