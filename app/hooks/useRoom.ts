@@ -304,6 +304,11 @@ export function useRoom(userId: string | null): UseRoomReturn {
 
   // 订阅房间实时更新
   const subscribe = useCallback((roomId: string): (() => void) => {
+    console.log("🔌 开始建立 Realtime 订阅", {
+      roomId,
+      timestamp: new Date().toISOString(),
+    });
+
     const unsubscribers: Array<() => void> = [];
 
     // 订阅房间状态变化（rooms 表）
@@ -346,6 +351,7 @@ export function useRoom(userId: string | null): UseRoomReturn {
             eventType: payload.eventType,
             new: payload.new,
             old: payload.old,
+            timestamp: new Date().toISOString(),
           });
 
           if (
@@ -353,20 +359,44 @@ export function useRoom(userId: string | null): UseRoomReturn {
             payload.eventType === "UPDATE"
           ) {
             // 新增或更新玩家
-            console.log("➕ 添加或更新玩家:", payload.new.player_name);
+            console.log(
+              `${payload.eventType === "INSERT" ? "➕ 新玩家加入" : "♻️ 玩家信息更新"}:`,
+              payload.new.player_name,
+            );
             setPlayers((prev) => {
               const existing = prev.findIndex((p) => p.id === payload.new.id);
+              let updated: RoomPlayer[];
               if (existing >= 0) {
-                const updated = [...prev];
+                updated = [...prev];
                 updated[existing] = payload.new;
-                return updated;
+              } else {
+                updated = [...prev, payload.new];
               }
-              return [...prev, payload.new];
+              console.log("👥 更新后的玩家列表:", {
+                count: updated.length,
+                players: updated.map((p) => ({
+                  id: p.id,
+                  name: p.player_name,
+                  index: p.player_index,
+                })),
+              });
+              return updated;
             });
           } else if (payload.eventType === "DELETE") {
             // 删除玩家（玩家退出房间）
             console.log("➖ 删除玩家:", payload.old.player_name);
-            setPlayers((prev) => prev.filter((p) => p.id !== payload.old.id));
+            setPlayers((prev) => {
+              const updated = prev.filter((p) => p.id !== payload.old.id);
+              console.log("👥 删除后的玩家列表:", {
+                count: updated.length,
+                players: updated.map((p) => ({
+                  id: p.id,
+                  name: p.player_name,
+                  index: p.player_index,
+                })),
+              });
+              return updated;
+            });
           }
         },
       )
@@ -404,7 +434,13 @@ export function useRoom(userId: string | null): UseRoomReturn {
     });
 
     // 返回取消所有订阅的函数
+    console.log("✅ Realtime 订阅建立完成，订阅了 3 个频道", {
+      roomId,
+      channels: ["rooms", "room_players", "room_games"],
+    });
+    
     return () => {
+      console.log("❌ 取消 Realtime 订阅", roomId);
       unsubscribers.forEach((unsub) => unsub());
     };
   }, []);

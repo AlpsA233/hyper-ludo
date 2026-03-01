@@ -46,8 +46,19 @@ export default function RoomLobby({
     console.log("📍 RoomLobby: 加载房间数据", roomId);
     loadRoom(roomId);
     const unsubscribe = subscribe(roomId);
-    return unsubscribe;
-  }, [roomId]);
+    
+    // 备用轮询机制：每2秒重新加载一次，确保看到新加入的玩家
+    // 这是为了解决 Realtime 在某些情况下可能延迟的问题
+    const pollInterval = setInterval(() => {
+      console.log("🔄 RoomLobby: 定期查询最新房间数据（轮询）");
+      loadRoom(roomId);
+    }, 2000);
+    
+    return () => {
+      clearInterval(pollInterval);
+      unsubscribe();
+    };
+  }, [roomId, loadRoom]);
 
   // 监听房间对象变化
   useEffect(() => {
