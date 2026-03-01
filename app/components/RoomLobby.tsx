@@ -22,16 +22,25 @@ export default function RoomLobby({
   onCancel,
   t,
 }: RoomLobbyProps) {
-  const { room, players, isCreator, startGame, leaveRoom, subscribe, error } =
-    useRoom(userId);
+  const {
+    room,
+    players,
+    isCreator,
+    startGame,
+    leaveRoom,
+    subscribe,
+    error,
+    loadRoom,
+  } = useRoom(userId);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // 订阅房间实时更新
+  // 加载房间数据和订阅实时更新
   useEffect(() => {
+    loadRoom(roomId);
     const unsubscribe = subscribe(roomId);
     return unsubscribe;
-  }, [roomId, subscribe]);
+  }, [roomId, subscribe, loadRoom]);
 
   const handleStartGame = async () => {
     setLoading(true);

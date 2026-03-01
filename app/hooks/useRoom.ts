@@ -59,6 +59,7 @@ interface UseRoomReturn {
     lap: number,
   ) => Promise<void>;
   endGame: () => Promise<void>;
+  loadRoom: (roomId: string) => Promise<void>;
 
   // 实时订阅
   subscribe: (roomId: string) => () => void; // 返回取消订阅函数
@@ -323,6 +324,43 @@ export function useRoom(userId: string | null): UseRoomReturn {
     }
   };
 
+  // 加载指定房间的数据
+  const loadRoom = async (roomId: string): Promise<void> => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      // 加载房间信息
+      const { data: roomData, error: roomError } = await supabase
+        .from("rooms")
+        .select("*")
+        .eq("id", roomId)
+        .maybeSingle();
+
+      if (roomError || !roomData) throw new Error("Room not found");
+
+      setRoom(roomData);
+
+      // 加载房间玩家列表
+      const { data: playersData, error: playersError } = await supabase
+        .from("room_players")
+        .select("*")
+        .eq("room_id", roomId);
+
+      if (playersError) {
+        console.error("Failed to load players:", playersError);
+      } else {
+        setPlayers(playersData || []);
+      }
+    } catch (err: any) {
+      const msg = err.message || "Failed to load room";
+      setError(msg);
+      console.error("Room load error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 订阅房间实时更新
   const subscribe = (roomId: string): (() => void) => {
     const channel = supabase
@@ -370,6 +408,7 @@ export function useRoom(userId: string | null): UseRoomReturn {
     startGame,
     updatePlayerPosition,
     endGame,
+    loadRoom,
     subscribe,
   };
 }

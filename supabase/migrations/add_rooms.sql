@@ -107,15 +107,25 @@ CREATE POLICY "Room creator can delete room"
   USING (auth.uid() = creator_id);
 
 -- 房间玩家表策略
-CREATE POLICY "Room players can view their room"
+CREATE POLICY "Room players can view their room - creators"
   ON room_players FOR SELECT
   USING (
     EXISTS (
       SELECT 1 FROM rooms
-      WHERE id = room_id
-        AND (creator_id = auth.uid() OR id IN (
-          SELECT room_id FROM room_players WHERE user_id = auth.uid()
-        ))
+      WHERE id = room_id AND creator_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Room players can view their room - participants"
+  ON room_players FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM rooms r
+      WHERE r.id = room_id
+        AND EXISTS (
+          SELECT 1 FROM room_players rp
+          WHERE rp.room_id = r.id AND rp.user_id = auth.uid()
+        )
     )
   );
 
