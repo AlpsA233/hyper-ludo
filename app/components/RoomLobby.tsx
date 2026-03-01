@@ -40,7 +40,7 @@ export default function RoomLobby({
     loadRoom(roomId);
     const unsubscribe = subscribe(roomId);
     return unsubscribe;
-  }, [roomId, subscribe, loadRoom]);
+  }, [roomId]);
 
   const handleStartGame = async () => {
     setLoading(true);

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import type { Player } from "../types";
 
@@ -325,7 +325,7 @@ export function useRoom(userId: string | null): UseRoomReturn {
   };
 
   // 加载指定房间的数据
-  const loadRoom = async (roomId: string): Promise<void> => {
+  const loadRoom = useCallback(async (roomId: string): Promise<void> => {
     setLoading(true);
     setError(null);
 
@@ -359,10 +359,10 @@ export function useRoom(userId: string | null): UseRoomReturn {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // 订阅房间实时更新
-  const subscribe = (roomId: string): (() => void) => {
+  const subscribe = useCallback((roomId: string): (() => void) => {
     const channel = supabase
       .channel(`room_players:${roomId}`)
       .on(
@@ -392,7 +392,7 @@ export function useRoom(userId: string | null): UseRoomReturn {
     return () => {
       channel.unsubscribe();
     };
-  };
+  }, []);
 
   const isCreator = room ? room.creator_id === userId : false;
 
