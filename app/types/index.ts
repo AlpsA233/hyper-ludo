@@ -3,7 +3,10 @@ export type GamePhase =
   | "auth"
   | "setup"
   | "settings"
+  | "room_select" // 新增：房间选择（创建/加入房间）
+  | "room_lobby" // 新增：房间大厅（等待玩家）
   | "playing"
+  | "multiplayer" // 新增：多人游戏模式
   | "config_cards"
   | "config_events"
   | "config_manager"

@@ -8,6 +8,7 @@ import { useLanguage } from "@/app/hooks/useLanguage";
 import { useDeviceShake } from "@/app/hooks/useDeviceShake";
 import { useAuth } from "@/app/hooks/useAuth";
 import { useUserData } from "@/app/hooks/useUserData";
+import { useRoom } from "@/app/hooks/useRoom";
 import {
   Dice1,
   Dice2,
@@ -27,6 +28,8 @@ import {
 } from "lucide-react";
 import AuthScreen from "@/app/components/AuthScreen";
 import GameSetup from "@/app/components/GameSetup";
+import RoomManager from "@/app/components/RoomManager";
+import RoomLobby from "@/app/components/RoomLobby";
 import CardEditor from "@/app/components/CardEditor";
 import EventEditor from "@/app/components/EventEditor";
 import GameSettings from "@/app/components/GameSettings";
@@ -124,6 +127,19 @@ export default function App() {
     DEFAULT_CARD_DB,
     DEFAULT_EVENT_DB,
   );
+
+  // 房间管理（Phase 3.1）
+  const {
+    room,
+    players: roomPlayers,
+    isCreator,
+    createRoom,
+    joinRoom,
+    leaveRoom,
+    startGame: startMultiplayerGame,
+  } = useRoom(user?.id || null);
+
+  const [roomId, setRoomId] = useState<string | null>(null);
 
   // 检测是否为PC端（屏幕宽度 >= 1024px）
   const [isPC, setIsPC] = useState(false);
@@ -900,6 +916,70 @@ export default function App() {
           </div>
         )}
 
+        {/* 房间选择 - 创建或加入房间 */}
+        {phase === "room_select" &&
+          (!user ? (
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-lg flex items-center justify-center p-4">
+              <div className="bg-black/60 border border-white/10 rounded-3xl p-8 max-w-sm w-full text-center space-y-4 animate-fade-in">
+                <h3 className="text-xl font-bold">
+                  {t.common.loading || "提示"}
+                </h3>
+                <p className="text-gray-400">
+                  {t.common.empty || "多人游戏需要登录"}
+                </p>
+                <button
+                  onClick={() => setPhase("setup")}
+                  className="w-full py-3 px-4 bg-white/10 border border-white/20 rounded-xl text-sm font-bold hover:bg-white/20 transition-all">
+                  {t.common.back || "返回"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <RoomManager
+              userId={user?.id || null}
+              onRoomCreated={(roomId) => {
+                setRoomId(roomId);
+                setPhase("room_lobby");
+              }}
+              onRoomJoined={(roomId) => {
+                setRoomId(roomId);
+                setPhase("room_lobby");
+              }}
+              onCancel={() => setPhase("setup")}
+              t={t}
+            />
+          ))}
+
+        {/* 房间大厅 - 等待所有玩家准备好 */}
+        {phase === "room_lobby" && roomId && (
+          <RoomLobby
+            roomId={roomId}
+            userId={user?.id || null}
+            onStartGame={async () => {
+              try {
+                await startMultiplayerGame();
+                setPhase("multiplayer");
+              } catch (error) {
+                console.error("Failed to start game:", error);
+              }
+            }}
+            onLeaveRoom={async () => {
+              try {
+                await leaveRoom();
+                setRoomId(null);
+                setPhase("setup");
+              } catch (error) {
+                console.error("Failed to leave room:", error);
+              }
+            }}
+            onCancel={() => {
+              setRoomId(null);
+              setPhase("setup");
+            }}
+            t={t}
+          />
+        )}
+
         {phase === "setup" && (
           <GameSetup
             numPlayers={numPlayers}
@@ -913,6 +993,7 @@ export default function App() {
             onManageConfig={() => setPhase("library_manager")}
             onUserSettings={() => setPhase("settings")}
             onStartGame={startGame}
+            onMultiplayer={() => setPhase("room_select")}
             t={t}
           />
         )}

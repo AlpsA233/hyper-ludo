@@ -16,6 +16,7 @@ interface GameSetupProps {
   onManageConfig: () => void;
   onUserSettings: () => void;
   onStartGame: () => void;
+  onMultiplayer: () => void;
   t: Translations;
 }
 
@@ -31,6 +32,7 @@ export default function GameSetup({
   onManageConfig,
   onUserSettings,
   onStartGame,
+  onMultiplayer,
   t,
 }: GameSetupProps) {
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
@@ -143,6 +145,11 @@ export default function GameSetup({
             </div>
           )}
         </div>
+        <button
+          onClick={onMultiplayer}
+          className="w-full py-3 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-xl font-bold text-sm hover:from-purple-500/30 hover:to-pink-500/30 transition-all shadow-lg active:scale-95">
+          🌐 {t.common.create || "多人游戏"}
+        </button>
         <button
           onClick={onStartGame}
           className="w-full py-4 bg-white text-black font-black rounded-xl active:scale-95 shadow-[0_0_30px_rgba(255,255,255,0.1)] mt-4 transition-all">

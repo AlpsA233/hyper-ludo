@@ -9,6 +9,18 @@ export interface Translations {
     add: string;
     close: string;
     confirm: string;
+    create: string;
+    join: string;
+    copy: string;
+    copied: string;
+    back: string;
+    continue: string;
+    loading: string;
+    empty: string;
+    playerName: string;
+    startGame: string;
+    starting: string;
+    leaveGame: string;
   };
 
   // Auth
@@ -180,6 +192,21 @@ export interface Translations {
     lastDice: string;
   };
 
+  // Room (Multiplayer)
+  room: {
+    lobby: string;
+    roomCode: string;
+    players: string;
+    config: string;
+    createRoom: string;
+    joinRoom: string;
+    createInfo: string;
+    joinInfo: string;
+    shareCode: string;
+    shareInfo: string;
+    waitingForPlayer: string;
+  };
+
   // Player names
   player: string;
   circle: string;
@@ -194,6 +221,18 @@ const zh: Translations = {
     add: "添加",
     close: "关闭",
     confirm: "确认",
+    create: "创建",
+    join: "加入",
+    copy: "复制",
+    copied: "已复制",
+    back: "返回",
+    continue: "继续",
+    loading: "加载中...",
+    empty: "空",
+    playerName: "玩家名称",
+    startGame: "开始游戏",
+    starting: "开始中...",
+    leaveGame: "离开游戏",
   },
   auth: {
     welcome: "欢迎来到星际派对！",
@@ -350,6 +389,19 @@ const zh: Translations = {
     totalLaps: "目标圈数",
     lastDice: "上次掷骰",
   },
+  room: {
+    lobby: "游戏大厅",
+    roomCode: "房间码",
+    players: "玩家",
+    config: "游戏配置",
+    createRoom: "创建房间",
+    joinRoom: "加入房间",
+    createInfo: "创建一个新房间与朋友一起游戏",
+    joinInfo: "输入房间码加入游戏",
+    shareCode: "分享这个房间码给朋友",
+    shareInfo: "朋友们可以用这个码加入你的房间",
+    waitingForPlayer: "等待玩家...",
+  },
   player: "玩家",
   circle: "圈",
   cancel: "取消",
@@ -363,6 +415,18 @@ const en: Translations = {
     add: "Add",
     close: "Close",
     confirm: "Confirm",
+    create: "Create",
+    join: "Join",
+    copy: "Copy",
+    copied: "Copied",
+    back: "Back",
+    continue: "Continue",
+    loading: "Loading...",
+    empty: "Empty",
+    playerName: "Player Name",
+    startGame: "Start Game",
+    starting: "Starting...",
+    leaveGame: "Leave Game",
   },
   auth: {
     welcome: "Welcome to Space Party!",
@@ -520,6 +584,19 @@ const en: Translations = {
     currentRound: "Current Turn",
     totalLaps: "Target Laps",
     lastDice: "Last Roll",
+  },
+  room: {
+    lobby: "Game Lobby",
+    roomCode: "Room Code",
+    players: "Players",
+    config: "Game Config",
+    createRoom: "Create Room",
+    joinRoom: "Join Room",
+    createInfo: "Create a new room to play with friends",
+    joinInfo: "Enter room code to join a game",
+    shareCode: "Share this code with friends",
+    shareInfo: "Friends can use this code to join your room",
+    waitingForPlayer: "Waiting for player...",
   },
   player: "Player",
   circle: "Circle",

@@ -143,7 +143,7 @@ Phase 3 (后续)   → 多用户同局网络同步
 
 ### 功能 2.1: Supabase 用户认证
 
-**完成度**: ✅ 95% (需配置 OAuth 提供商)
+**完成度**: ✅ 100% **COMPLETED**
 **预计工时**: 2-3 小时
 
 #### 技术方案
@@ -215,18 +215,24 @@ Phase 3 (后续)   → 多用户同局网络同步
 
 #### 测试清单
 
-- [ ] 登录流程: Google OAuth 可工作（需配置后测试）
-- [ ] 登录流程: GitHub OAuth 可工作（需配置后测试）
+- [x] 登录流程: Google OAuth 可工作 ✅
+- [x] 登录流程: GitHub OAuth 可工作 ✅
 - [x] 游客模式: 可以跳过登录直接进入
 - [x] Session 持久化: 页面刷新后保持登录
 - [x] 登出功能: 返回登录屏幕
 - [x] 国际化: 所有语言显示正确
 
+#### 已完成
+
+- ✅ Supabase 项目创建和 OAuth 配置
+- ✅ 前端认证UI和流程实现
+- ✅ 修改 Supabase Site URL 解决 localhost 跳转问题
+
 ---
 
 ### 功能 2.2: 用户数据持久化
 
-**完成度**: ✅ 95% (需执行 SQL schema)
+**完成度**: ✅ 100% **COMPLETED**
 **预计工时**: 1 小时
 
 #### 技术方案
@@ -279,21 +285,21 @@ Phase 3 (后续)   → 多用户同局网络同步
   - [x] 替换所有 setCardDatabase/setEventDatabase
   - [x] 使用 userData.saveCards/saveEvents
 
-- [ ] 执行 Supabase SQL Schema（5分钟）
-  - [ ] 打开 Supabase SQL Editor
-  - [ ] 执行 `supabase/schema.sql`
-  - [ ] 验证 3 个表创建成功
-  - [ ] 验证 RLS 策略生效
+- [x] 执行 Supabase SQL Schema ✅
+  - [x] 打开 Supabase SQL Editor
+  - [x] 执行 `supabase/schema.sql`
+  - [x] 验证 3 个表创建成功
+  - [x] 验证 RLS 策略生效
 
 #### 测试清单
 
-- [ ] 首次登录: localStorage 数据自动迁移到 Supabase
-- [ ] 编辑卡牌: 保存后在 Supabase Table Editor 看到数据
-- [ ] 编辑事件: 保存后在 Supabase 看到数据
-- [ ] 修改背景/头像: 保存后在 user_profiles 表看到
-- [ ] 跨设备同步: B 设备登录同一账号，看到 A 设备的数据
-- [ ] 游客模式: 不影响云端，仅本地存储
-- [ ] 离线模式: Supabase 连接失败时降级到 localStorage
+- [x] 首次登录: localStorage 数据自动迁移到 Supabase ✅
+- [x] 编辑卡牌: 保存后在 Supabase Table Editor 看到数据 ✅
+- [x] 编辑事件: 保存后在 Supabase 看到数据 ✅
+- [x] 修改背景/头像: 保存后在 user_profiles 表看到 ✅
+- [x] 跨设备同步: B 设备登录同一账号，看到 A 设备的数据 ✅
+- [x] 游客模式: 不影响云端，仅本地存储 ✅
+- [x] 离线模式: Supabase 连接失败时降级到 localStorage ✅
 
 #### 已完成文件
 
@@ -511,33 +517,33 @@ const unsubscribe = ref(db, `rooms/${roomId}/game`).on("value", (snapshot) => {
 - [x] 测试 & 修复
 - **预期**: 游戏体验大幅升级 ✅ **已达成**
 
-### Week 2
+### Week 2 ✅ **COMPLETED**
 
-- [ ] Phase 2.1: Firebase 认证系统
-- [ ] Phase 2.2: 数据持久化迁移
-- [ ] 测试 & QA
-- [ ] **预期**: 用户可跨设备同步卡牌
+- [x] Phase 2.1: Supabase 认证系统 ✅
+- [x] Phase 2.2: 数据持久化迁移 ✅
+- [x] 测试 & QA ✅
+- **成果**: 用户可跨设备同步卡牌 ✅ **已达成**
 
-### Week 3+
+### Week 3+ (当前)
 
-- [ ] Phase 3.1: 房间系统
-- [ ] Phase 3.2: 状态同步
-- [ ] Phase 3.3: UI 适配
-- [ ] **预期**: MVP 完成，支持多人在线游戏
+- [ ] Phase 3.1: 房间系统（多用户同局）
+- [ ] Phase 3.2: 状态同步（实时协作）
+- [ ] Phase 3.3: UI 适配（多设备支持）
+- **目标**: MVP 完成，支持多人在线游戏
 
 ---
 
 ## 🔧 技术栈总结
 
-| 功能     | 技术                     |
-| -------- | ------------------------ |
-| 骰子配置 | React State              |
-| 摇一摇   | DeviceMotionEvent API    |
-| 用户认证 | Firebase Auth            |
-| 数据存储 | Firebase Realtime DB     |
-| 房间系统 | Firebase + Realtime DB   |
-| 状态同步 | Firebase Listeners       |
-| 实时通信 | Firebase（或 Socket.io） |
+| 功能     | 技术                            |
+| -------- | ------------------------------- |
+| 骰子配置 | React State                     |
+| 摇一摇   | DeviceMotionEvent API           |
+| 用户认证 | Supabase Auth (OAuth)           |
+| 数据存储 | Supabase PostgreSQL             |
+| 房间系统 | Supabase + Realtime API         |
+| 状态同步 | Supabase Realtime Subscriptions |
+| 实时通信 | Supabase Realtime + WebSocket   |
 
 ---
 
@@ -570,11 +576,11 @@ const unsubscribe = ref(db, `rooms/${roomId}/game`).on("value", (snapshot) => {
 **讨论内容**: 功能优先级排序 + 技术方案评审  
 **决策**:
 
-1. ✅ Phase 1 本周内完成
-2. ✅ Phase 2 为 Phase 3 铺路
-3. ✅ Firebase 作为后端首选
-4. ✅ 本地 LAN + Cloud 混合模式
+1. ✅ Phase 1 本周内完成 ✅ **已完成**
+2. ✅ Phase 2 为 Phase 3 铺路 ✅ **已完成**
+3. ✅ Supabase 作为后端首选（替代 Firebase）✅ **已迁移**
+4. ✅ 本地 LAN + Cloud 混合模式（待 Phase 3 实现）
 
 ---
 
-**最后更新**: 2026-02-28 | **状态**: 🔵 计划阶段
+**最后更新**: 2026-03-01 | **状态**: 🟡 Phase 3 进行中 (多用户同局开发)
