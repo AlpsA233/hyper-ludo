@@ -120,19 +120,6 @@ CREATE POLICY "Room players can view their room - creators"
     )
   );
 
-CREATE POLICY "Room players can view their room - participants"
-  ON room_players FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM rooms r
-      WHERE r.id = room_id
-        AND EXISTS (
-          SELECT 1 FROM room_players rp
-          WHERE rp.room_id = r.id AND rp.user_id = auth.uid()
-        )
-    )
-  );
-
 CREATE POLICY "Users can insert themselves as room player"
   ON room_players FOR INSERT
   WITH CHECK (auth.uid() = user_id);
@@ -154,6 +141,16 @@ CREATE POLICY "Room players can view game state"
       SELECT 1 FROM room_players
       WHERE room_id = room_games.room_id
         AND user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Room creator can create game state"
+  ON room_games FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM rooms
+      WHERE id = room_id
+        AND creator_id = auth.uid()
     )
   );
 

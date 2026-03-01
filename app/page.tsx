@@ -958,7 +958,31 @@ export default function App() {
             onStartGame={async () => {
               try {
                 await startMultiplayerGame();
-                setPhase("multiplayer");
+                // 初始化游戏玩家数据
+                if (roomPlayers && roomPlayers.length > 0) {
+                  const gamePlayers: Player[] = roomPlayers.map((rp) => ({
+                    id: rp.user_id,
+                    name: rp.player_name,
+                    avatar: rp.avatar,
+                    colorIndex: rp.color_index,
+                    position: rp.position >= 0 ? rp.position : -1,
+                    lap: rp.lap,
+                    startPos: 0, // 每个玩家起点为0
+                    cards: [],
+                    shield: false,
+                    skipTurn: false,
+                  }));
+                  setPlayers(gamePlayers);
+                }
+                // 使用房间配置初始化游戏
+                if (room) {
+                  setNumPlayers(room.num_players);
+                  setDiceCount(room.dice_count);
+                  setLapsToWin(room.laps_to_win);
+                  setInitialCards(room.initial_cards);
+                  setEventDensity(room.event_density);
+                }
+                setPhase("playing");
               } catch (error) {
                 console.error("Failed to start game:", error);
               }
