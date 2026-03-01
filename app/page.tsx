@@ -889,7 +889,7 @@ export default function App() {
               console.log("📤 调用endPlayerTurn来进入下一个玩家");
               try {
                 // 使用 API 直接调用，而不是依赖 endPlayerTurn hook（它可能缺少 room 状态）
-                await fetch("/api/rooms", {
+                const response = await fetch("/api/rooms", {
                   method: "POST",
                   headers: {
                     "Content-Type": "application/json",
@@ -899,9 +899,25 @@ export default function App() {
                     action: "endPlayerTurn",
                     roomId,
                   }),
-                }).then(res => res.json());
+                });
+
+                if (!response.ok) {
+                  const errorData = await response.json();
+                  console.error(
+                    "❌ endPlayerTurn API错误 (" + response.status + "):",
+                    errorData.error,
+                  );
+                  // fallback: 本地更新
+                  setTurn((turn + 1) % numPlayers);
+                } else {
+                  const data = await response.json();
+                  console.log(
+                    "✅ endPlayerTurn 成功，回合已更新到玩家:",
+                    data.turn + 1,
+                  );
+                }
               } catch (err) {
-                console.error("❌ endPlayerTurn 失败:", err);
+                console.error("❌ endPlayerTurn 异常:", err);
                 // fallback: 本地更新
                 setTurn((turn + 1) % numPlayers);
               }
@@ -943,7 +959,7 @@ export default function App() {
             console.log("📤 调用endPlayerTurn来进入下一个玩家");
             try {
               // 使用 API 直接调用，而不是依赖 endPlayerTurn hook（它可能缺少 room 状态）
-              await fetch("/api/rooms", {
+              const response = await fetch("/api/rooms", {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
@@ -953,9 +969,25 @@ export default function App() {
                   action: "endPlayerTurn",
                   roomId,
                 }),
-              }).then(res => res.json());
+              });
+
+              if (!response.ok) {
+                const errorData = await response.json();
+                console.error(
+                  "❌ endPlayerTurn API错误 (" + response.status + "):",
+                  errorData.error,
+                );
+                // fallback: 本地更新
+                setTurn((turn + 1) % numPlayers);
+              } else {
+                const data = await response.json();
+                console.log(
+                  "✅ endPlayerTurn 成功，回合已更新到玩家:",
+                  data.turn + 1,
+                );
+              }
             } catch (err) {
-              console.error("❌ endPlayerTurn 失败:", err);
+              console.error("❌ endPlayerTurn 异常:", err);
               // fallback: 本地更新
               setTurn((turn + 1) % numPlayers);
             }
@@ -1255,11 +1287,11 @@ export default function App() {
                 }
 
                 await startMultiplayerGame();
-                
+
                 // 重新加载最新的房间数据到 useRoom 状态
                 await loadRoom(roomId);
                 // 再等一下，确保状态更新完成
-                await new Promise(resolve => setTimeout(resolve, 100));
+                await new Promise((resolve) => setTimeout(resolve, 100));
 
                 // 使用房间配置初始化游戏
                 const numPlayersFromRoom =
@@ -1332,6 +1364,32 @@ export default function App() {
                   setPlayers(defaultPlayers);
                   setTurn(0);
                 }
+
+                // 🔧 关键：生成游戏棋盘瓷砖（使用房间的eventDensity）
+                const eventDensityValue =
+                  latestRoom?.event_density || eventDensity;
+                console.log(
+                  "🎲 生成棋盘瓷砖 - eventDensity:",
+                  eventDensityValue,
+                );
+
+                const tiles: BoardTile[] = Array.from({
+                  length: totalSteps,
+                }).map((_, i) => {
+                  // 起始点附近保持安全
+                  if (
+                    i % (totalSteps / (latestRoom?.num_players || numPlayers)) <
+                    2
+                  ) {
+                    return { id: "SAFE" as const };
+                  }
+                  // 根据事件密度生成CUSTOM格子
+                  return Math.random() * 100 < eventDensityValue
+                    ? { id: "CUSTOM" as const }
+                    : { id: "SAFE" as const };
+                });
+                setBoardTiles(tiles);
+                setEventCounts({});
 
                 setPhase("playing");
               } catch (error) {
