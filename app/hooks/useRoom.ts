@@ -87,6 +87,13 @@ interface UseRoomReturn {
   rollDice: (diceCount: number) => Promise<any>;
   movePlayer: (position: number, lapCount: number) => Promise<any>;
   triggerEvent: (event: any) => Promise<any>;
+  updateRoomConfig: (config: {
+    num_players: number;
+    dice_count: number;
+    laps_to_win: number;
+    initial_cards: number;
+    event_density: number;
+  }) => Promise<any>;
   loadRoom: (roomId: string) => Promise<void>;
   subscribe: (roomId: string) => () => void; // 返回取消订阅函数
 }
@@ -269,6 +276,34 @@ export function useRoom(userId: string | null): UseRoomReturn {
         roomId: room.id,
         event,
       });
+
+      return result;
+    } catch (err: any) {
+      setError(err.message);
+      throw err;
+    }
+  };
+
+  // 更新房间配置（仅创建者可以）
+  const updateRoomConfig = async (config: {
+    num_players: number;
+    dice_count: number;
+    laps_to_win: number;
+    initial_cards: number;
+    event_density: number;
+  }): Promise<any> => {
+    if (!room || !userId) {
+      throw new Error("Not in a room");
+    }
+
+    try {
+      const result = await callRoomService("updateRoomConfig", {
+        roomId: room.id,
+        config,
+      });
+
+      // 更新本地房间状态
+      setRoom(result);
 
       return result;
     } catch (err: any) {
@@ -461,6 +496,7 @@ export function useRoom(userId: string | null): UseRoomReturn {
     rollDice,
     movePlayer,
     triggerEvent,
+    updateRoomConfig,
     loadRoom,
     subscribe,
   };

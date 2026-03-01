@@ -362,6 +362,59 @@ async function triggerEvent(roomId: string, userId: string, event: any) {
   };
 }
 
+// 更新房间配置（仅房间创建者可以，且仅在游戏未开始时）
+async function updateRoomConfig(
+  roomId: string,
+  userId: string,
+  config: any,
+) {
+  // 验证用户是房间创建者
+  const { data: room, error: roomError } = await supabaseAdmin
+    .from("rooms")
+    .select("creator_id, state, current_players")
+    .eq("id", roomId)
+    .single();
+
+  if (roomError || !room) {
+    throw new Error("Room not found");
+  }
+
+  if (room.creator_id !== userId) {
+    throw new Error("Only room creator can update config");
+  }
+
+  if (room.state === "playing") {
+    throw new Error("Cannot update config while game is playing");
+  }
+
+  // 验证配置有效性
+  if (config.num_players && config.num_players < room.current_players) {
+    throw new Error(
+      `Cannot reduce players to ${config.num_players} (${room.current_players} already joined)`,
+    );
+  }
+
+  // 更新房间配置
+  const { data: updatedRoom, error: updateError } = await supabaseAdmin
+    .from("rooms")
+    .update({
+      num_players: config.num_players,
+      dice_count: config.dice_count,
+      laps_to_win: config.laps_to_win,
+      initial_cards: config.initial_cards,
+      event_density: config.event_density,
+    })
+    .eq("id", roomId)
+    .select()
+    .single();
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  return updatedRoom;
+}
+
 // 获取房间信息（用于重新连接）
 async function getRoomInfo(roomId: string, userId: string) {
   // 验证玩家是否在房间中
@@ -458,6 +511,9 @@ export async function POST(request: NextRequest) {
         break;
       case "triggerEvent":
         result = await triggerEvent(roomId, userId, event);
+        break;
+      case "updateRoomConfig":
+        result = await updateRoomConfig(roomId, userId, config);
         break;
       default:
         return NextResponse.json({ error: "Unknown action" }, { status: 400 });

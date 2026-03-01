@@ -1079,6 +1079,11 @@ export default function App() {
           ) : (
             <RoomManager
               userId={user?.id || null}
+              numPlayers={numPlayers}
+              diceCount={diceCount}
+              lapsToWin={lapsToWin}
+              initialCards={initialCards}
+              eventDensity={eventDensity}
               onRoomCreated={(roomId) => {
                 setRoomId(roomId);
                 setPhase("room_lobby");

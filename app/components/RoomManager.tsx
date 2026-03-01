@@ -7,6 +7,11 @@ import { useRoom } from "@/app/hooks/useRoom";
 
 interface RoomManagerProps {
   userId: string | null;
+  numPlayers: number;
+  diceCount: number;
+  lapsToWin: number;
+  initialCards: number;
+  eventDensity: number;
   onRoomCreated?: (roomId: string) => void;
   onRoomJoined?: (roomId: string) => void;
   onCancel?: () => void;
@@ -15,6 +20,11 @@ interface RoomManagerProps {
 
 export default function RoomManager({
   userId,
+  numPlayers,
+  diceCount,
+  lapsToWin,
+  initialCards,
+  eventDensity,
   onRoomCreated,
   onRoomJoined,
   onCancel,
@@ -42,11 +52,11 @@ export default function RoomManager({
     try {
       const roomId = await createRoom(
         {
-          num_players: 4,
-          dice_count: 1,
-          laps_to_win: 3,
-          initial_cards: 5,
-          event_density: 40,
+          num_players: numPlayers,
+          dice_count: diceCount,
+          laps_to_win: lapsToWin,
+          initial_cards: initialCards,
+          event_density: eventDensity,
         },
         playerName,
       );
