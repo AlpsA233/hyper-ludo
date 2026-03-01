@@ -7,6 +7,7 @@ import { getTranslation } from "@/app/locales";
 import { useLanguage } from "@/app/hooks/useLanguage";
 import { useDeviceShake } from "@/app/hooks/useDeviceShake";
 import { useAuth } from "@/app/hooks/useAuth";
+import { useUserData } from "@/app/hooks/useUserData";
 import {
   Dice1,
   Dice2,
@@ -117,6 +118,13 @@ export default function App() {
 
   const [guestMode, setGuestMode] = useState(false);
 
+  // 用户数据同步（云端或本地）
+  const userData = useUserData(
+    user?.id || null,
+    DEFAULT_CARD_DB,
+    DEFAULT_EVENT_DB,
+  );
+
   // 检测是否为PC端（屏幕宽度 >= 1024px）
   const [isPC, setIsPC] = useState(false);
 
@@ -138,20 +146,6 @@ export default function App() {
   const [winner, setWinner] = useState<Player | null>(null);
   const [gsapLoaded, setGsapLoaded] = useState(false);
   const [hasUsedCard, setHasUsedCard] = useState(false);
-
-  // 自定义数据状态
-  const [cardDatabase, setCardDatabase] = useState<Card[]>(DEFAULT_CARD_DB);
-  const [eventDatabase, setEventDatabase] =
-    useState<GameEvent[]>(DEFAULT_EVENT_DB);
-
-  // 设置状态
-  const [backgroundSettings, setBackgroundSettings] = useState<{
-    type: "color" | "image";
-    value: string;
-  }>({ type: "color", value: "#050510" });
-  const [playerAvatars, setPlayerAvatars] = useState<string[]>(
-    Array(8).fill("👤"),
-  );
 
   const [showCardDrawer, setShowCardDrawer] = useState(false);
   const [pickingTargetFor, setPickingTargetFor] = useState<Card | null>(null);
@@ -274,17 +268,6 @@ export default function App() {
       document.body.appendChild(script);
     } else setGsapLoaded(true);
 
-    const savedCards = localStorage.getItem("party_ludo_cards");
-    if (savedCards) setCardDatabase(JSON.parse(savedCards));
-    const savedEvents = localStorage.getItem("party_ludo_events");
-    if (savedEvents) setEventDatabase(JSON.parse(savedEvents));
-
-    // 加载背景和头像设置
-    const savedBg = localStorage.getItem("hyper_ludo_background");
-    if (savedBg) setBackgroundSettings(JSON.parse(savedBg));
-    const savedAvatars = localStorage.getItem("hyper_ludo_avatars");
-    if (savedAvatars) setPlayerAvatars(JSON.parse(savedAvatars));
-
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, []);
 
@@ -345,7 +328,7 @@ export default function App() {
 
   // --- 游戏逻辑 ---
   const startGame = () => {
-    if (eventDatabase.length === 0) return alert(t.game.noEventsAlert);
+    if (userData.eventDatabase.length === 0) return alert(t.game.noEventsAlert);
 
     // 重置事件计数
     setEventCounts({});
@@ -380,11 +363,13 @@ export default function App() {
         startPos: Math.floor(totalSteps / numPlayers) * i, // 记录每个玩家的起始位置
         shield: false,
         skipTurn: false,
-        avatar: playerAvatars[i] || "👤", // 应用玩家头像设置
+        avatar: userData.playerAvatars[i] || "👤", // 应用玩家头像设置
         name: savedNames[i] || `${t.player} ${i + 1}`, // 应用玩家名称设置
         cards: Array.from({ length: initialCards }).map(() => {
           const baseCard =
-            cardDatabase[Math.floor(Math.random() * cardDatabase.length)];
+            userData.cardDatabase[
+              Math.floor(Math.random() * userData.cardDatabase.length)
+            ];
           const card: Card = {
             id: baseCard.id,
             rarity: baseCard.rarity as "NR" | "R" | "SR" | "SSR",
@@ -653,7 +638,7 @@ export default function App() {
           const currentProgress = (newLap / totalLaps) * 100;
 
           // 筛选当前进度允许的事件
-          let allowedEvents = eventDatabase.filter((evt) => {
+          let allowedEvents = userData.eventDatabase.filter((evt) => {
             // 如果progressRange未定义，表示全程都允许
             if (!evt.progressRange) return true;
             // 否则检查当前进度是否在范围内
@@ -782,18 +767,18 @@ export default function App() {
       className="fixed inset-0 text-white font-sans overflow-hidden select-none"
       style={{
         backgroundColor:
-          backgroundSettings.type === "color"
-            ? backgroundSettings.value
+          userData.backgroundType === "color"
+            ? userData.backgroundValue
             : undefined,
         backgroundImage:
-          backgroundSettings.type === "image"
-            ? `url(${backgroundSettings.value})`
+          userData.backgroundType === "image"
+            ? `url(${userData.backgroundValue})`
             : undefined,
         backgroundSize: "cover",
         backgroundPosition: "center",
       }}>
       {/* 背景遮罩层 */}
-      {backgroundSettings.type === "image" && (
+      {userData.backgroundType === "image" && (
         <div
           className="fixed inset-0 z-0 pointer-events-none"
           style={{
@@ -803,7 +788,7 @@ export default function App() {
         />
       )}
 
-      {backgroundSettings.type === "color" && (
+      {userData.backgroundType === "color" && (
         <>
           <div className="space-background" />
           <div className="star-layer-1" />
@@ -965,10 +950,9 @@ export default function App() {
 
         {phase === "config_cards" && (
           <CardEditor
-            cards={cardDatabase}
+            cards={userData.cardDatabase}
             onSave={(cards) => {
-              setCardDatabase(cards);
-              localStorage.setItem("party_ludo_cards", JSON.stringify(cards));
+              userData.saveCards(cards);
               setPhase("setup");
             }}
             onCancel={() => setPhase("setup")}
@@ -977,10 +961,9 @@ export default function App() {
         )}
         {phase === "config_events" && (
           <EventEditor
-            events={eventDatabase}
+            events={userData.eventDatabase}
             onSave={(events) => {
-              setEventDatabase(events);
-              localStorage.setItem("party_ludo_events", JSON.stringify(events));
+              userData.saveEvents(events);
               setPhase("setup");
             }}
             onCancel={() => setPhase("setup")}
@@ -1001,22 +984,10 @@ export default function App() {
             <div className="flex-1 overflow-y-auto p-6">
               <div className="max-w-2xl mx-auto">
                 <ConfigManager
-                  cards={cardDatabase}
-                  events={eventDatabase}
-                  onLoadCards={(cards) => {
-                    setCardDatabase(cards);
-                    localStorage.setItem(
-                      "party_ludo_cards",
-                      JSON.stringify(cards),
-                    );
-                  }}
-                  onLoadEvents={(events) => {
-                    setEventDatabase(events);
-                    localStorage.setItem(
-                      "party_ludo_events",
-                      JSON.stringify(events),
-                    );
-                  }}
+                  cards={userData.cardDatabase}
+                  events={userData.eventDatabase}
+                  onLoadCards={(cards) => userData.saveCards(cards)}
+                  onLoadEvents={(events) => userData.saveEvents(events)}
                   t={t}
                 />
               </div>
@@ -1029,6 +1000,13 @@ export default function App() {
             onSave={() => setPhase("setup")}
             onCancel={() => setPhase("setup")}
             t={t}
+            initialBgType={userData.backgroundType}
+            initialBgValue={userData.backgroundValue}
+            initialAvatars={userData.playerAvatars}
+            initialPlayerNames={userData.playerNames}
+            onSaveSettings={async (settings) => {
+              await userData.saveProfile(settings);
+            }}
           />
         )}
 

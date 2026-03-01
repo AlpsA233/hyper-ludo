@@ -226,51 +226,89 @@ Phase 3 (后续)   → 多用户同局网络同步
 
 ### 功能 2.2: 用户数据持久化
 
-**完成度**: 0%  
+**完成度**: ✅ 95% (需执行 SQL schema)
 **预计工时**: 1 小时
 
 #### 技术方案
 
-- 迁移本地 localStorage → Firebase Realtime DB
-- 卡牌库、事件库自动云同步
-- 跨设备数据一致性
+- ✅ 迁移本地 localStorage → Supabase PostgreSQL
+- ✅ 卡牌库、事件库自动云同步
+- ✅ 跨设备数据一致性
+- ✅ 离线模式支持（localStorage fallback）
 
 #### 具体任务
 
-- [ ] 数据库结构设计
+- [x] 数据库结构设计
 
-  ```
-  /users/{uid}
-    /profile
-    /cards[]
-    /events[]
-    /settings{}
-    /gameHistory[]
+  ```sql
+  -- user_profiles: 用户配置（背景、头像、名称）
+  -- user_cards: 用户自定义卡牌库
+  -- user_events: 用户自定义事件库
+  -- RLS: 用户只能读写自己的数据
   ```
 
-- [ ] 迁移 CardDatabase
-  - [ ] 云端读取用户自定义卡牌
-  - [ ] 本地 localStorage 作为备份
-  - [ ] 冲突解决（云端优先）
+- [x] 创建 useUserData Hook
+  - [x] 自动检测登录状态（userId）
+  - [x] 登录用户：从 Supabase 读写
+  - [x] 游客模式：使用 localStorage
+  - [x] 首次登录：自动迁移 localStorage → Supabase
+  - [x] 离线模式：优雅降级到 localStorage
 
-- [ ] 迁移 EventDatabase
-  - [ ] 同 CardDatabase 逻辑
-  - [ ] 确保事件编辑同步保存
+- [x] 迁移 CardDatabase
+  - [x] 云端读取用户自定义卡牌
+  - [x] 本地 localStorage 作为备份
+  - [x] 保存时同时写入云端和本地
 
-- [ ] 迁移 PlayerAvatars & Names
-  - [ ] 用户个人信息存储
-  - [ ] 游戏开始时加载
+- [x] 迁移 EventDatabase
+  - [x] 云端读取用户自定义事件
+  - [x] localStorage 备份
+  - [x] 自动同步
 
-- [ ] 离线模式支持
-  - [ ] 网络断开时使用本地数据
-  - [ ] 网络恢复时自动同步
-  - [ ] 冲突检测（选择新/旧）
+- [x] 迁移 PlayerAvatars & Names
+  - [x] 存储到 user_profiles 表
+  - [x] 游戏开始时加载
+  - [x] 修改即保存
+
+- [x] 修改 GameSettings 组件
+  - [x] 接受 userData props
+  - [x] 调用 saveProfile() 保存到云端
+
+- [x] 集成到 page.tsx
+  - [x] 使用 useUserData hook
+  - [x] 传递 userId (user?.id)
+  - [x] 替换所有 setCardDatabase/setEventDatabase
+  - [x] 使用 userData.saveCards/saveEvents
+
+- [ ] 执行 Supabase SQL Schema（5分钟）
+  - [ ] 打开 Supabase SQL Editor
+  - [ ] 执行 `supabase/schema.sql`
+  - [ ] 验证 3 个表创建成功
+  - [ ] 验证 RLS 策略生效
 
 #### 测试清单
 
-- [ ] Firebase 读写正常
-- [ ] 跨浏览器标签同步: A 标签编辑卡牌，B 标签立即看到
-- [ ] 离线编辑: 网络断开，本地添加数据，网络恢复自动上传
+- [ ] 首次登录: localStorage 数据自动迁移到 Supabase
+- [ ] 编辑卡牌: 保存后在 Supabase Table Editor 看到数据
+- [ ] 编辑事件: 保存后在 Supabase 看到数据
+- [ ] 修改背景/头像: 保存后在 user_profiles 表看到
+- [ ] 跨设备同步: B 设备登录同一账号，看到 A 设备的数据
+- [ ] 游客模式: 不影响云端，仅本地存储
+- [ ] 离线模式: Supabase 连接失败时降级到 localStorage
+
+#### 已完成文件
+
+- ✅ `supabase/schema.sql` - 数据库 Schema
+- ✅ `app/hooks/useUserData.ts` - 数据同步 Hook (280 行)
+- ✅ `app/components/GameSettings.tsx` - 修改为云端同步
+- ✅ `app/page.tsx` - 集成 useUserData
+- ✅ `SUPABASE_DATABASE_SETUP.md` - 数据库初始化指南
+
+#### 下一步（5分钟）
+
+1. 访问 [Supabase SQL Editor](https://supabase.com/dashboard/project/qjirnckllkqsrnicrnaz/sql)
+2. 执行 `supabase/schema.sql` 文件内容
+3. 验证表创建成功（user_profiles, user_cards, user_events）
+4. 测试云端同步功能
 
 ---
 

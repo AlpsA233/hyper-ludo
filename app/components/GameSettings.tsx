@@ -17,6 +17,16 @@ interface GameSettingsProps {
   onSave: () => void;
   onCancel: () => void;
   t: Translations;
+  initialBgType: "color" | "image";
+  initialBgValue: string;
+  initialAvatars: string[];
+  initialPlayerNames: string[];
+  onSaveSettings: (settings: {
+    backgroundType: "color" | "image";
+    backgroundValue: string;
+    playerAvatars: string[];
+    playerNames: string[];
+  }) => Promise<void>;
 }
 
 const PRESET_COLORS = [
@@ -57,15 +67,16 @@ export default function GameSettings({
   onSave,
   onCancel,
   t,
+  initialBgType,
+  initialBgValue,
+  initialAvatars,
+  initialPlayerNames,
+  onSaveSettings,
 }: GameSettingsProps) {
-  const [bgType, setBgType] = useState<"color" | "image">("color");
-  const [bgValue, setBgValue] = useState("#050510");
-  const [avatars, setAvatars] = useState<string[]>(Array(8).fill("👤"));
-  const [playerNames, setPlayerNames] = useState<string[]>(
-    Array(8)
-      .fill(0)
-      .map((_, i) => `${t.player} ${i + 1}`),
-  );
+  const [bgType, setBgType] = useState<"color" | "image">(initialBgType);
+  const [bgValue, setBgValue] = useState(initialBgValue);
+  const [avatars, setAvatars] = useState<string[]>(initialAvatars);
+  const [playerNames, setPlayerNames] = useState<string[]>(initialPlayerNames);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [editingAvatarIndex, setEditingAvatarIndex] = useState<number | null>(
@@ -74,36 +85,21 @@ export default function GameSettings({
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
-    // 加载现有设置
-    const savedBg = localStorage.getItem("hyper_ludo_background");
-    if (savedBg) {
-      const parsed = JSON.parse(savedBg);
-      setBgType(parsed.type);
-      setBgValue(parsed.value);
-    }
-    const savedAvatars = localStorage.getItem("hyper_ludo_avatars");
-    if (savedAvatars) {
-      setAvatars(JSON.parse(savedAvatars));
-    }
-    const savedNames = localStorage.getItem("hyper_ludo_player_names");
-    if (savedNames) {
-      setPlayerNames(JSON.parse(savedNames));
-    }
-  }, []);
+    // 使用传入的初始值
+    setBgType(initialBgType);
+    setBgValue(initialBgValue);
+    setAvatars(initialAvatars);
+    setPlayerNames(initialPlayerNames);
+  }, [initialBgType, initialBgValue, initialAvatars, initialPlayerNames]);
 
-  const handleSave = () => {
-    // 保存背景设置
-    localStorage.setItem(
-      "hyper_ludo_background",
-      JSON.stringify({ type: bgType, value: bgValue }),
-    );
-    // 保存头像设置
-    localStorage.setItem("hyper_ludo_avatars", JSON.stringify(avatars));
-    // 保存玩家名称
-    localStorage.setItem(
-      "hyper_ludo_player_names",
-      JSON.stringify(playerNames),
-    );
+  const handleSave = async () => {
+    // 保存到云端或本地
+    await onSaveSettings({
+      backgroundType: bgType,
+      backgroundValue: bgValue,
+      playerAvatars: avatars,
+      playerNames: playerNames,
+    });
     onSave();
   };
 
