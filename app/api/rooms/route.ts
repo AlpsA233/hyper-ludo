@@ -163,6 +163,205 @@ async function leaveRoom(roomId: string, userId: string) {
   return { success: true };
 }
 
+// 开始游戏
+async function startGame(roomId: string, userId: string) {
+  // 验证用户是房间创建者
+  const { data: room, error: roomError } = await supabaseAdmin
+    .from("rooms")
+    .select("creator_id, state")
+    .eq("id", roomId)
+    .single();
+
+  if (roomError || !room) {
+    throw new Error("Room not found");
+  }
+
+  if (room.creator_id !== userId) {
+    throw new Error("Only room creator can start game");
+  }
+
+  if (room.state === "playing") {
+    throw new Error("Game already started");
+  }
+
+  // 创建游戏状态记录
+  const { data: existingGame } = await supabaseAdmin
+    .from("room_games")
+    .select("id")
+    .eq("room_id", roomId)
+    .maybeSingle();
+
+  if (!existingGame) {
+    await supabaseAdmin.from("room_games").insert({
+      room_id: roomId,
+      turn: 0,
+      phase: "playing",
+      logs: [],
+    });
+  } else {
+    // 重置游戏状态
+    await supabaseAdmin
+      .from("room_games")
+      .update({
+        turn: 0,
+        phase: "playing",
+        dice_value: null,
+        dice_results: null,
+        active_event: null,
+        active_card: null,
+        logs: [],
+      })
+      .eq("room_id", roomId);
+  }
+
+  // 更新房间状态
+  await supabaseAdmin
+    .from("rooms")
+    .update({ state: "playing" })
+    .eq("id", roomId);
+
+  // 获取完整房间信息
+  const { data: players } = await supabaseAdmin
+    .from("room_players")
+    .select("*")
+    .eq("room_id", roomId);
+
+  const { data: updatedRoom } = await supabaseAdmin
+    .from("rooms")
+    .select("*")
+    .eq("id", roomId)
+    .single();
+
+  return {
+    room: updatedRoom,
+    players: players || [],
+  };
+}
+
+// 掷骰子
+async function rollDice(roomId: string, userId: string, diceCount: number) {
+  // 验证玩家在房间中
+  const { data: player } = await supabaseAdmin
+    .from("room_players")
+    .select("player_index")
+    .eq("room_id", roomId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!player) {
+    throw new Error("Not in this room");
+  }
+
+  // 获取游戏状态
+  const { data: gameState } = await supabaseAdmin
+    .from("room_games")
+    .select("turn")
+    .eq("room_id", roomId)
+    .single();
+
+  // 生成掷骰结果
+  const diceResults = Array.from(
+    { length: diceCount },
+    () => Math.floor(Math.random() * 6) + 1,
+  );
+  const diceValue = diceResults.reduce((a, b) => a + b, 0);
+
+  // 更新游戏状态
+  const { data: updatedGame } = await supabaseAdmin
+    .from("room_games")
+    .update({
+      dice_value: diceValue,
+      dice_results: diceResults,
+      phase: "moving",
+    })
+    .eq("room_id", roomId)
+    .select()
+    .single();
+
+  return {
+    diceValue,
+    diceResults,
+    turn: gameState?.turn,
+  };
+}
+
+// 移动玩家
+async function movePlayer(
+  roomId: string,
+  userId: string,
+  position: number,
+  lapCount: number,
+) {
+  // 验证玩家在房间中
+  const { data: player } = await supabaseAdmin
+    .from("room_players")
+    .select("id")
+    .eq("room_id", roomId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!player) {
+    throw new Error("Not in this room");
+  }
+
+  // 更新玩家位置
+  const { error: updateError } = await supabaseAdmin
+    .from("room_players")
+    .update({
+      position: position,
+      lap_count: lapCount,
+    })
+    .eq("room_id", roomId)
+    .eq("user_id", userId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  // 获取完整房间信息
+  const { data: players } = await supabaseAdmin
+    .from("room_players")
+    .select("*")
+    .eq("room_id", roomId);
+
+  return {
+    position,
+    lapCount,
+    players: players || [],
+  };
+}
+
+// 触发事件
+async function triggerEvent(roomId: string, userId: string, event: any) {
+  // 验证玩家在房间中
+  const { data: player } = await supabaseAdmin
+    .from("room_players")
+    .select("id")
+    .eq("room_id", roomId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!player) {
+    throw new Error("Not in this room");
+  }
+
+  // 更新游戏状态中的事件
+  const { data: updatedGame } = await supabaseAdmin
+    .from("room_games")
+    .update({
+      active_event: event,
+      phase: "event",
+    })
+    .eq("room_id", roomId)
+    .select()
+    .single();
+
+  return {
+    event,
+    phase: "event",
+  };
+}
+
 // 获取房间信息（用于重新连接）
 async function getRoomInfo(roomId: string, userId: string) {
   // 验证玩家是否在房间中
@@ -206,7 +405,10 @@ export async function POST(request: NextRequest) {
       playerName,
       roomCode,
       roomId,
-      userId: reqUserId,
+      diceCount,
+      position,
+      lapCount,
+      event,
     } = body;
 
     // 验证授权（从 Authorization header 获取用户信息）
@@ -244,6 +446,18 @@ export async function POST(request: NextRequest) {
         break;
       case "getRoomInfo":
         result = await getRoomInfo(roomId, userId);
+        break;
+      case "startGame":
+        result = await startGame(roomId, userId);
+        break;
+      case "rollDice":
+        result = await rollDice(roomId, userId, diceCount);
+        break;
+      case "movePlayer":
+        result = await movePlayer(roomId, userId, position, lapCount);
+        break;
+      case "triggerEvent":
+        result = await triggerEvent(roomId, userId, event);
         break;
       default:
         return NextResponse.json({ error: "Unknown action" }, { status: 400 });

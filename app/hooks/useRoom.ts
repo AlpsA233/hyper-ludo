@@ -60,6 +60,7 @@ interface UseRoomReturn {
   room: RoomInfo | null;
   players: RoomPlayer[];
   isCreator: boolean;
+  gameState: any | null; // 游戏状态（从 room_games 表）
 
   // 加载状态
   loading: boolean;
@@ -83,12 +84,9 @@ interface UseRoomReturn {
   ) => Promise<string>; // 返回roomId
   leaveRoom: () => Promise<void>;
   startGame: () => Promise<void>;
-  updatePlayerPosition: (
-    playerIndex: number,
-    position: number,
-    lap: number,
-  ) => Promise<void>;
-  endGame: () => Promise<void>;
+  rollDice: (diceCount: number) => Promise<any>;
+  movePlayer: (position: number, lapCount: number) => Promise<any>;
+  triggerEvent: (event: any) => Promise<any>;
   loadRoom: (roomId: string) => Promise<void>;
   subscribe: (roomId: string) => () => void; // 返回取消订阅函数
 }
@@ -100,6 +98,7 @@ interface UseRoomReturn {
 export function useRoom(userId: string | null): UseRoomReturn {
   const [room, setRoom] = useState<RoomInfo | null>(null);
   const [players, setPlayers] = useState<RoomPlayer[]>([]);
+  const [gameState, setGameState] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -194,73 +193,87 @@ export function useRoom(userId: string | null): UseRoomReturn {
     }
   };
 
-  // 开始游戏
+  // 开始游戏（通过服务端 API）
   const startGame = async (): Promise<void> => {
     if (!room || !userId) return;
 
     try {
-      // 只有创建者能开始游戏
-      if (room.creator_id !== userId)
-        throw new Error("Only room creator can start");
+      const { room: updatedRoom, players: updatedPlayers } =
+        await callRoomService("startGame", {
+          roomId: room.id,
+        });
 
-      // 更新房间状态
-      await supabase
-        .from("rooms")
-        .update({ state: "playing" })
-        .eq("id", room.id);
+      setRoom(updatedRoom);
+      setPlayers(updatedPlayers);
+    } catch (err: any) {
+      setError(err.message);
+      throw err;
+    }
+  };
 
-      // 创建游戏状态记录
-      await supabase.from("room_games").insert({
-        room_id: room.id,
-        turn: 0,
-        phase: "playing",
-        dice_value: 0,
-        dice_results: [],
+  // 掷骰子（通过服务端 API）
+  const rollDice = async (diceCount: number): Promise<any> => {
+    if (!room || !userId) {
+      throw new Error("Not in a room");
+    }
+
+    try {
+      const result = await callRoomService("rollDice", {
+        roomId: room.id,
+        diceCount,
       });
 
-      setRoom({ ...room, state: "playing" });
+      return result;
     } catch (err: any) {
       setError(err.message);
+      throw err;
     }
   };
 
-  // 更新玩家位置
-  const updatePlayerPosition = async (
-    playerIndex: number,
+  // 移动玩家（通过服务端 API）
+  const movePlayer = async (
     position: number,
-    lap: number,
-  ): Promise<void> => {
-    if (!room) return;
+    lapCount: number,
+  ): Promise<any> => {
+    if (!room || !userId) {
+      throw new Error("Not in a room");
+    }
 
     try {
-      const player = players.find((p) => p.player_index === playerIndex);
-      if (player) {
-        await supabase
-          .from("room_players")
-          .update({ position, lap })
-          .eq("id", player.id);
+      const result = await callRoomService("movePlayer", {
+        roomId: room.id,
+        position,
+        lapCount,
+      });
+
+      // 更新本地玩家列表
+      if (result.players) {
+        setPlayers(result.players);
       }
+
+      return result;
     } catch (err: any) {
-      console.error("Failed to update player position:", err);
+      setError(err.message);
+      throw err;
     }
   };
 
-  // 结束游戏
-  const endGame = async (): Promise<void> => {
-    if (!room || !userId) return;
+  // 触发事件（通过服务端 API）
+  const triggerEvent = async (event: any): Promise<any> => {
+    if (!room || !userId) {
+      throw new Error("Not in a room");
+    }
 
     try {
-      if (room.creator_id !== userId)
-        throw new Error("Only room creator can end game");
+      const result = await callRoomService("triggerEvent", {
+        roomId: room.id,
+        event,
+      });
 
-      await supabase
-        .from("rooms")
-        .update({ state: "finished" })
-        .eq("id", room.id);
-
-      setRoom({ ...room, state: "finished" });
+      return result;
     } catch (err: any) {
       setError(err.message);
+      throw err;
     }
   };
 
@@ -291,7 +304,10 @@ export function useRoom(userId: string | null): UseRoomReturn {
 
   // 订阅房间实时更新
   const subscribe = useCallback((roomId: string): (() => void) => {
-    const channel = supabase
+    const unsubscribers: Array<() => void> = [];
+
+    // 订阅房间玩家变化
+    const playersChannel = supabase
       .channel(`room_players:${roomId}`)
       .on(
         "postgres_changes",
@@ -324,8 +340,40 @@ export function useRoom(userId: string | null): UseRoomReturn {
       )
       .subscribe();
 
+    unsubscribers.push(() => {
+      playersChannel.unsubscribe();
+    });
+
+    // 订阅房间游戏状态变化
+    const gameStateChannel = supabase
+      .channel(`room_games:${roomId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "room_games",
+          filter: `room_id=eq.${roomId}`,
+        },
+        (payload: any) => {
+          if (
+            payload.eventType === "INSERT" ||
+            payload.eventType === "UPDATE"
+          ) {
+            // 更新游戏状态
+            setGameState(payload.new);
+          }
+        },
+      )
+      .subscribe();
+
+    unsubscribers.push(() => {
+      gameStateChannel.unsubscribe();
+    });
+
+    // 返回取消所有订阅的函数
     return () => {
-      channel.unsubscribe();
+      unsubscribers.forEach((unsub) => unsub());
     };
   }, []);
 
@@ -334,6 +382,7 @@ export function useRoom(userId: string | null): UseRoomReturn {
   return {
     room,
     players,
+    gameState,
     isCreator,
     loading,
     error,
@@ -341,8 +390,9 @@ export function useRoom(userId: string | null): UseRoomReturn {
     joinRoom,
     leaveRoom,
     startGame,
-    updatePlayerPosition,
-    endGame,
+    rollDice,
+    movePlayer,
+    triggerEvent,
     loadRoom,
     subscribe,
   };
