@@ -675,40 +675,70 @@ export default function App() {
       // 多人游戏：调用服务器 API 生成掷骰结果
       if (isMultiplayer && roomId) {
         console.log("🎲 多人模式：调用 rollDice API，diceCount:", diceCount);
-        const { diceValue: apiDiceValue, diceResults: apiDiceResults } =
-          await roomRollDice(diceCount);
-        console.log("📡 服务器掷骰结果:", {
-          diceValue: apiDiceValue,
-          diceResults: apiDiceResults,
-          length: apiDiceResults?.length,
-          hasGsap: !!(window as any).gsap,
-        });
-
-        // 使用服务器返回的结果显示动画
-        if (
-          (window as any).gsap &&
-          apiDiceResults &&
-          apiDiceResults.length > 0
-        ) {
-          console.log("▶️  开始播放骰子动画...");
-          await animateDiceRoll(apiDiceResults);
-          setDiceValue(apiDiceValue);
-          setDiceResults(apiDiceResults);
-
-          const resultString =
-            diceCount === 1
-              ? `${apiDiceValue}`
-              : `${apiDiceResults.join(", ")} (总计: ${apiDiceValue})`;
-          addLog(`Player ${turn + 1} rolled ${resultString}`);
-
-          console.log("✅ 动画完成，调用handleMove移动玩家");
-          setIsRolling(false);
-          handleMove(apiDiceValue);
-        } else {
-          console.error("❌ 无法播放动画:", {
-            hasGsap: !!(window as any).gsap,
-            apiDiceResults,
+        try {
+          const response = await fetch("/api/rooms", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${(await supabase.auth.getSession())?.data.session?.access_token || ""}`,
+            },
+            body: JSON.stringify({
+              action: "rollDice",
+              roomId,
+              diceCount,
+            }),
           });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error(
+              "❌ rollDice API错误 (" + response.status + "):",
+              errorData.error,
+            );
+            addLog("❌ 掷骰子失败，请重试");
+            setIsRolling(false);
+            return;
+          }
+
+          const { diceValue: apiDiceValue, diceResults: apiDiceResults } =
+            await response.json();
+          console.log("📡 服务器掷骰结果:", {
+            diceValue: apiDiceValue,
+            diceResults: apiDiceResults,
+            length: apiDiceResults?.length,
+            hasGsap: !!(window as any).gsap,
+          });
+
+          // 使用服务器返回的结果显示动画
+          if (
+            (window as any).gsap &&
+            apiDiceResults &&
+            apiDiceResults.length > 0
+          ) {
+            console.log("▶️  开始播放骰子动画...");
+            await animateDiceRoll(apiDiceResults);
+            setDiceValue(apiDiceValue);
+            setDiceResults(apiDiceResults);
+
+            const resultString =
+              diceCount === 1
+                ? `${apiDiceValue}`
+                : `${apiDiceResults.join(", ")} (总计: ${apiDiceValue})`;
+            addLog(`Player ${turn + 1} rolled ${resultString}`);
+
+            console.log("✅ 动画完成，调用handleMove移动玩家");
+            setIsRolling(false);
+            handleMove(apiDiceValue);
+          } else {
+            console.error("❌ 无法播放动画:", {
+              hasGsap: !!(window as any).gsap,
+              apiDiceResults,
+            });
+            setIsRolling(false);
+          }
+        } catch (err) {
+          console.error("❌ rollDice API异常:", err);
+          addLog("❌ 掷骰子失败，请重试");
           setIsRolling(false);
         }
       } else {
@@ -1323,7 +1353,25 @@ export default function App() {
                       startPos: 0,
                       shield: false,
                       skipTurn: false,
-                      cards: [],
+                      cards: Array.from({
+                        length: latestRoom?.initial_cards || initialCards,
+                      }).map(() => {
+                        const baseCard =
+                          userData.cardDatabase[
+                            Math.floor(
+                              Math.random() * userData.cardDatabase.length,
+                            )
+                          ];
+                        return {
+                          id: baseCard.id,
+                          rarity: baseCard.rarity as "NR" | "R" | "SR" | "SSR",
+                          name: baseCard.name,
+                          desc: baseCard.desc,
+                          pattern: baseCard.pattern,
+                          target: baseCard.target,
+                          effect: baseCard.effect,
+                        } as Card;
+                      }),
                       avatar:
                         rp.avatar ||
                         ["🔵", "🟣", "🟡", "🟢"][rp.player_index % 4],
@@ -1360,7 +1408,27 @@ export default function App() {
                     startPos: 0,
                     shield: false,
                     skipTurn: false,
-                    cards: [],
+                    cards: Array.from({
+                      length: numPlayersFromRoom
+                        ? latestRoom?.initial_cards || initialCards
+                        : initialCards,
+                    }).map(() => {
+                      const baseCard =
+                        userData.cardDatabase[
+                          Math.floor(
+                            Math.random() * userData.cardDatabase.length,
+                          )
+                        ];
+                      return {
+                        id: baseCard.id,
+                        rarity: baseCard.rarity as "NR" | "R" | "SR" | "SSR",
+                        name: baseCard.name,
+                        desc: baseCard.desc,
+                        pattern: baseCard.pattern,
+                        target: baseCard.target,
+                        effect: baseCard.effect,
+                      } as Card;
+                    }),
                     avatar: ["🔵", "🟣", "🟡", "🟢"][i] || "🔵",
                     name: `Player ${i + 1}`,
                   }));
