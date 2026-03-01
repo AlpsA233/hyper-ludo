@@ -9,6 +9,7 @@ import { useDeviceShake } from "@/app/hooks/useDeviceShake";
 import { useAuth } from "@/app/hooks/useAuth";
 import { useUserData } from "@/app/hooks/useUserData";
 import { useRoom } from "@/app/hooks/useRoom";
+import { supabase } from "@/app/lib/supabase";
 import {
   Dice1,
   Dice2,
@@ -140,6 +141,7 @@ export default function App() {
     startGame: startMultiplayerGame,
     rollDice: roomRollDice,
     subscribe,
+    loadRoom,
   } = useRoom(user?.id || null);
 
   const [roomId, setRoomId] = useState<string | null>(null);
@@ -1104,28 +1106,59 @@ export default function App() {
             userId={user?.id || null}
             onStartGame={async () => {
               try {
-                // 等待 Realtime 同步最新房间配置
-                await new Promise(resolve => setTimeout(resolve, 200));
+                // 🔧 关键：在开始游戏前重新加载最新的房间和玩家数据
+                // （因为 RoomLobby 可能刚编辑过配置，而页面的状态可能还没有同步）
+                let latestRoom = room;
+                let latestRoomPlayers = roomPlayers;
+                
+                if (roomId) {
+                  console.log("🔄 游戏开始前：重新加载最新房间和玩家数据...");
+                  try {
+                    // 从 API 直接获取最新数据，而不是等待状态更新
+                    const { room: newRoom, players: newPlayers } = await fetch("/api/rooms", {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${(await supabase.auth.getSession())?.data.session?.access_token || ""}`,
+                      },
+                      body: JSON.stringify({
+                        action: "getRoomInfo",
+                        roomId,
+                      }),
+                    }).then(res => res.json());
+                    
+                    if (newRoom) {
+                      latestRoom = newRoom;
+                      latestRoomPlayers = newPlayers || [];
+                      console.log("✅ 获取最新房间数据成功:", {
+                        num_players: newRoom.num_players,
+                        players: newPlayers?.length || 0,
+                      });
+                    }
+                  } catch (err) {
+                    console.warn("⚠️ 无法获取最新房间数据，使用页面状态:", err);
+                  }
+                }
                 
                 await startMultiplayerGame();
 
                 // 使用房间配置初始化游戏
-                const numPlayersFromRoom = room?.num_players || numPlayers;
-                if (room) {
-                  setNumPlayers(room.num_players);
-                  setDiceCount(room.dice_count);
-                  setLapsToWin(room.laps_to_win);
-                  setInitialCards(room.initial_cards);
-                  setEventDensity(room.event_density);
+                const numPlayersFromRoom = latestRoom?.num_players || numPlayers;
+                if (latestRoom) {
+                  setNumPlayers(latestRoom.num_players);
+                  setDiceCount(latestRoom.dice_count);
+                  setLapsToWin(latestRoom.laps_to_win);
+                  setInitialCards(latestRoom.initial_cards);
+                  setEventDensity(latestRoom.event_density);
                 }
 
                 // 初始化游戏玩家数据
-                if (roomPlayers && roomPlayers.length > 0) {
+                if (latestRoomPlayers && latestRoomPlayers.length > 0) {
                   console.log(
                     "👥 使用房间玩家数据初始化游戏:",
-                    roomPlayers.length,
+                    latestRoomPlayers.length,
                   );
-                  const gamePlayers: Player[] = roomPlayers
+                  const gamePlayers: Player[] = latestRoomPlayers
                     .sort((a, b) => a.player_index - b.player_index) // 按索引排序确保顺序一致
                     .map((rp) => ({
                       id: rp.player_index,
@@ -1144,13 +1177,13 @@ export default function App() {
                   setPlayers(gamePlayers);
 
                   // 🔧 关键修复：重新计算当前玩家索引（确保权限检查正确）
-                  const myIndex = roomPlayers.findIndex(
+                  const myIndex = latestRoomPlayers.findIndex(
                     (p) => p.user_id === user?.id,
                   );
                   console.log("🎮 游戏开始 - 重新计算当前玩家索引:", {
                     myIndex,
                     userId: user?.id,
-                    totalPlayers: roomPlayers.length,
+                    totalPlayers: latestRoomPlayers.length,
                   });
                   setCurrentPlayerIndex(myIndex >= 0 ? myIndex : null);
 
