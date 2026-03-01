@@ -87,6 +87,7 @@ interface UseRoomReturn {
   rollDice: (diceCount: number) => Promise<any>;
   movePlayer: (position: number, lapCount: number) => Promise<any>;
   triggerEvent: (event: any) => Promise<any>;
+  endPlayerTurn: () => Promise<any>;
   updateRoomConfig: (config: {
     num_players: number;
     dice_count: number;
@@ -275,6 +276,24 @@ export function useRoom(userId: string | null): UseRoomReturn {
       const result = await callRoomService("triggerEvent", {
         roomId: room.id,
         event,
+      });
+
+      return result;
+    } catch (err: any) {
+      setError(err.message);
+      throw err;
+    }
+  };
+
+  // 完成当前玩家的回合，进入下一个玩家
+  const endPlayerTurn = async (): Promise<any> => {
+    if (!room || !userId) {
+      throw new Error("Not in a room");
+    }
+
+    try {
+      const result = await callRoomService("endPlayerTurn", {
+        roomId: room.id,
       });
 
       return result;
@@ -496,6 +515,7 @@ export function useRoom(userId: string | null): UseRoomReturn {
     rollDice,
     movePlayer,
     triggerEvent,
+    endPlayerTurn,
     updateRoomConfig,
     loadRoom,
     subscribe,

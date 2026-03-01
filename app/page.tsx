@@ -142,6 +142,7 @@ export default function App() {
     rollDice: roomRollDice,
     subscribe,
     loadRoom,
+    endPlayerTurn,
   } = useRoom(user?.id || null);
 
   const [roomId, setRoomId] = useState<string | null>(null);
@@ -359,28 +360,58 @@ export default function App() {
   useEffect(() => {
     if (!gameState || !isMultiplayer) return;
 
-    console.log("🎮 游戏状态更新:", gameState);
+    console.log("🎮 Realtime 游戏状态更新:", {
+      turn: gameState.turn,
+      dice_value: gameState.dice_value,
+      dice_results: gameState.dice_results,
+      phase: gameState.phase,
+    });
 
     // 更新 turn
-    if (gameState.turn !== undefined) {
+    if (gameState.turn !== undefined && gameState.turn !== turn) {
+      console.log(`🔄 回合更新: ${turn} → ${gameState.turn}`);
       setTurn(gameState.turn);
     }
 
     // 更新掷骰结果
-    if (gameState.dice_results) {
-      setDiceResults(gameState.dice_results);
+    if (gameState.dice_results && gameState.dice_results.length > 0) {
+      if (
+        JSON.stringify(gameState.dice_results) !== JSON.stringify(diceResults)
+      ) {
+        console.log("🎲 骰子结果更新:", gameState.dice_results);
+        setDiceResults(gameState.dice_results);
+      }
     }
 
-    if (gameState.dice_value !== undefined) {
+    if (
+      gameState.dice_value !== undefined &&
+      gameState.dice_value !== diceValue
+    ) {
+      console.log("🎲 骰子总值更新:", gameState.dice_value);
       setDiceValue(gameState.dice_value);
     }
 
     // 如果掷骰完成，更新 phase 为 "moving"
     if (gameState.phase === "moving" && !isMoving && !isRolling) {
-      // 掷骰已完成，可以显示动画或处理
-      console.log("🎲 掷骰数值:", gameState.dice_value, gameState.dice_results);
+      // 其他玩家看到掷骰结果，不再显示动画
+      console.log(
+        "📍 其他玩家看到掷骰结果:",
+        gameState.dice_value,
+        gameState.dice_results,
+      );
+      addLog(
+        `Player ${gameState.turn + 1} rolled ${gameState.dice_results?.length === 1 ? gameState.dice_value : gameState.dice_results?.join(", ") + ` (总计: ${gameState.dice_value})`}`,
+      );
     }
-  }, [gameState, isMultiplayer, isMoving, isRolling]);
+  }, [
+    gameState,
+    isMultiplayer,
+    isMoving,
+    isRolling,
+    turn,
+    diceValue,
+    diceResults,
+  ]);
 
   // 多人游戏：同步房间玩家数据到游戏显示（用于左侧玩家部分）
   useEffect(() => {
@@ -611,18 +642,25 @@ export default function App() {
         addLog(`⏳ 等待玩家 ${turn + 1} 掷骰子...`);
         return;
       }
-      setPlayers((prev) =>
-        prev.map((p, i) => (i === turn ? { ...p, skipTurn: false } : p)),
-      );
-      // 清除暂停结束玩家的emoji，并在1秒后消失
-      const newCardEffectDisplay = { ...cardEffectDisplay };
-      if (newCardEffectDisplay[turn]) {
-        newCardEffectDisplay[turn].hideTime = Date.now() + 1000;
-        setCardEffectDisplay(newCardEffectDisplay);
+
+      // 🔧 检查玩家是否被跳过（因为卡牌或事件效果）
+      const currentPlayer = players[turn];
+      if (currentPlayer && currentPlayer.skipTurn) {
+        console.log(`⏭️  玩家 ${turn + 1} 被跳过，进入下一个回合`);
+        addLog(`⏭️  玩家 ${turn + 1} 被跳过`);
+        setPlayers((prev) =>
+          prev.map((p, i) => (i === turn ? { ...p, skipTurn: false } : p)),
+        );
+        // 清除暂停结束玩家的emoji，并在1秒后消失
+        const newCardEffectDisplay = { ...cardEffectDisplay };
+        if (newCardEffectDisplay[turn]) {
+          newCardEffectDisplay[turn].hideTime = Date.now() + 1000;
+          setCardEffectDisplay(newCardEffectDisplay);
+        }
+        setTurn((turn + 1) % numPlayers);
+        setHasUsedCard(false);
+        return;
       }
-      setTurn((turn + 1) % numPlayers);
-      setHasUsedCard(false);
-      return;
     }
 
     setIsRolling(true);
@@ -631,13 +669,23 @@ export default function App() {
     try {
       // 多人游戏：调用服务器 API 生成掷骰结果
       if (isMultiplayer && room) {
-        console.log("🎲 多人模式：调用 rollDice API");
+        console.log("🎲 多人模式：调用 rollDice API，diceCount:", diceCount);
         const { diceValue: apiDiceValue, diceResults: apiDiceResults } =
           await roomRollDice(diceCount);
-        console.log("📡 服务器掷骰结果:", apiDiceValue, apiDiceResults);
+        console.log("📡 服务器掷骰结果:", {
+          diceValue: apiDiceValue,
+          diceResults: apiDiceResults,
+          length: apiDiceResults?.length,
+          hasGsap: !!(window as any).gsap,
+        });
 
         // 使用服务器返回的结果显示动画
-        if ((window as any).gsap) {
+        if (
+          (window as any).gsap &&
+          apiDiceResults &&
+          apiDiceResults.length > 0
+        ) {
+          console.log("▶️  开始播放骰子动画...");
           await animateDiceRoll(apiDiceResults);
           setDiceValue(apiDiceValue);
           setDiceResults(apiDiceResults);
@@ -648,8 +696,15 @@ export default function App() {
               : `${apiDiceResults.join(", ")} (总计: ${apiDiceValue})`;
           addLog(`Player ${turn + 1} rolled ${resultString}`);
 
+          console.log("✅ 动画完成，调用handleMove移动玩家");
           setIsRolling(false);
           handleMove(apiDiceValue);
+        } else {
+          console.error("❌ 无法播放动画:", {
+            hasGsap: !!(window as any).gsap,
+            apiDiceResults,
+          });
+          setIsRolling(false);
         }
       } else {
         // 单人游戏：本地生成掷骰结果
@@ -762,6 +817,14 @@ export default function App() {
    * @param isEventMove - 是否是事件触发的移动（当前未使用此参数）
    */
   const handleMove = (steps: number, isEventMove: boolean = false) => {
+    console.log("🚀 handleMove 被调用:", {
+      steps,
+      isEventMove,
+      turn,
+      currentPlayer: players[turn]?.name,
+      isMultiplayer,
+    });
+
     setIsMoving(true);
     const p = players[turn];
 
@@ -792,7 +855,7 @@ export default function App() {
       const willTriggerEvent = isCustomTile;
 
       if (willTriggerEvent) {
-        setTimeout(() => {
+        setTimeout(async () => {
           // 计算当前游戏进度百分比 (0-100)
           const totalLaps = lapsToWin;
           const currentProgress = (newLap / totalLaps) * 100;
@@ -821,8 +884,20 @@ export default function App() {
           // 如果没有允许的事件，跳过事件触发
           if (allowedEvents.length === 0) {
             setIsMoving(false);
-            setTurn((turn + 1) % numPlayers);
-            setHasUsedCard(false);
+            // 🔧 多人游戏中，调用API来完成这个回合
+            if (isMultiplayer) {
+              console.log("📤 调用endPlayerTurn来进入下一个玩家");
+              try {
+                await endPlayerTurn();
+              } catch (err) {
+                console.error("❌ endPlayerTurn 失败:", err);
+                // fallback: 本地更新
+                setTurn((turn + 1) % numPlayers);
+              }
+            } else {
+              setTurn((turn + 1) % numPlayers);
+              setHasUsedCard(false);
+            }
             return;
           }
           const event =
@@ -851,8 +926,22 @@ export default function App() {
         }, 400);
       } else {
         setIsMoving(false);
-        setTurn((turn + 1) % numPlayers);
-        setHasUsedCard(false);
+        // 🔧 多人游戏中，调用API来完成这个回合
+        if (isMultiplayer) {
+          console.log("📤 调用endPlayerTurn来进入下一个玩家");
+          try {
+            endPlayerTurn().catch((err) => {
+              console.error("❌ endPlayerTurn 失败:", err);
+              // fallback: 本地更新
+              setTurn((turn + 1) % numPlayers);
+            });
+          } catch (err) {
+            console.error("❌ endPlayerTurn 异常:", err);
+          }
+        } else {
+          setTurn((turn + 1) % numPlayers);
+          setHasUsedCard(false);
+        }
       }
     });
   };
@@ -1110,23 +1199,26 @@ export default function App() {
                 // （因为 RoomLobby 可能刚编辑过配置，而页面的状态可能还没有同步）
                 let latestRoom = room;
                 let latestRoomPlayers = roomPlayers;
-                
+
                 if (roomId) {
                   console.log("🔄 游戏开始前：重新加载最新房间和玩家数据...");
                   try {
                     // 从 API 直接获取最新数据，而不是等待状态更新
-                    const { room: newRoom, players: newPlayers } = await fetch("/api/rooms", {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${(await supabase.auth.getSession())?.data.session?.access_token || ""}`,
+                    const { room: newRoom, players: newPlayers } = await fetch(
+                      "/api/rooms",
+                      {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                          Authorization: `Bearer ${(await supabase.auth.getSession())?.data.session?.access_token || ""}`,
+                        },
+                        body: JSON.stringify({
+                          action: "getRoomInfo",
+                          roomId,
+                        }),
                       },
-                      body: JSON.stringify({
-                        action: "getRoomInfo",
-                        roomId,
-                      }),
-                    }).then(res => res.json());
-                    
+                    ).then((res) => res.json());
+
                     if (newRoom) {
                       latestRoom = newRoom;
                       latestRoomPlayers = newPlayers || [];
@@ -1139,11 +1231,12 @@ export default function App() {
                     console.warn("⚠️ 无法获取最新房间数据，使用页面状态:", err);
                   }
                 }
-                
+
                 await startMultiplayerGame();
 
                 // 使用房间配置初始化游戏
-                const numPlayersFromRoom = latestRoom?.num_players || numPlayers;
+                const numPlayersFromRoom =
+                  latestRoom?.num_players || numPlayers;
                 if (latestRoom) {
                   setNumPlayers(latestRoom.num_players);
                   setDiceCount(latestRoom.dice_count);

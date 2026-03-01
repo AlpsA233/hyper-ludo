@@ -240,6 +240,8 @@ async function startGame(roomId: string, userId: string) {
 
 // 掷骰子
 async function rollDice(roomId: string, userId: string, diceCount: number) {
+  console.log("🎲 API: rollDice 被调用", { roomId, userId, diceCount });
+
   // 验证玩家在房间中
   const { data: player } = await supabaseAdmin
     .from("room_players")
@@ -259,6 +261,8 @@ async function rollDice(roomId: string, userId: string, diceCount: number) {
     .eq("room_id", roomId)
     .single();
 
+  console.log("📊 当前游戏状态:", gameState);
+
   // 生成掷骰结果
   const diceResults = Array.from(
     { length: diceCount },
@@ -266,8 +270,10 @@ async function rollDice(roomId: string, userId: string, diceCount: number) {
   );
   const diceValue = diceResults.reduce((a, b) => a + b, 0);
 
+  console.log("🎲 生成掷骰结果:", { diceValue, diceResults, diceCount });
+
   // 更新游戏状态
-  const { data: updatedGame } = await supabaseAdmin
+  const { data: updatedGame, error: updateError } = await supabaseAdmin
     .from("room_games")
     .update({
       dice_value: diceValue,
@@ -277,6 +283,13 @@ async function rollDice(roomId: string, userId: string, diceCount: number) {
     .eq("room_id", roomId)
     .select()
     .single();
+
+  if (updateError) {
+    console.error("❌ 更新游戏状态失败:", updateError);
+    throw new Error(updateError.message);
+  }
+
+  console.log("✅ 游戏状态已更新:", updatedGame);
 
   return {
     diceValue,
@@ -362,12 +375,81 @@ async function triggerEvent(roomId: string, userId: string, event: any) {
   };
 }
 
+// 完成当前玩家的回合，进入下一个玩家
+async function endPlayerTurn(roomId: string, userId: string) {
+  console.log("♻️  API: endPlayerTurn 被调用", { roomId, userId });
+
+  // 验证玩家在房间中
+  const { data: player } = await supabaseAdmin
+    .from("room_players")
+    .select("player_index")
+    .eq("room_id", roomId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!player) {
+    throw new Error("Not in this room");
+  }
+
+  // 获取房间配置
+  const { data: room } = await supabaseAdmin
+    .from("rooms")
+    .select("num_players")
+    .eq("id", roomId)
+    .single();
+
+  if (!room) {
+    throw new Error("Room not found");
+  }
+
+  // 获取当前游戏状态
+  const { data: gameState } = await supabaseAdmin
+    .from("room_games")
+    .select("turn")
+    .eq("room_id", roomId)
+    .single();
+
+  if (!gameState) {
+    throw new Error("Game state not found");
+  }
+
+  // 计算下一个玩家的索引
+  const nextTurn = (gameState.turn + 1) % room.num_players;
+
+  console.log("🔄 回合更新:", {
+    currentTurn: gameState.turn,
+    nextTurn,
+    numPlayers: room.num_players,
+  });
+
+  // 更新游戏状态：重置掷骰数据，更新turn
+  const { data: updatedGame, error: updateError } = await supabaseAdmin
+    .from("room_games")
+    .update({
+      turn: nextTurn,
+      dice_value: null,
+      dice_results: null,
+      phase: "playing",
+    })
+    .eq("room_id", roomId)
+    .select()
+    .single();
+
+  if (updateError) {
+    console.error("❌ 更新游戏状态失败:", updateError);
+    throw new Error(updateError.message);
+  }
+
+  console.log("✅ 回合已更新到玩家:", nextTurn + 1);
+
+  return {
+    turn: nextTurn,
+    phase: "playing",
+  };
+}
+
 // 更新房间配置（仅房间创建者可以，且仅在游戏未开始时）
-async function updateRoomConfig(
-  roomId: string,
-  userId: string,
-  config: any,
-) {
+async function updateRoomConfig(roomId: string, userId: string, config: any) {
   // 验证用户是房间创建者
   const { data: room, error: roomError } = await supabaseAdmin
     .from("rooms")
@@ -511,6 +593,9 @@ export async function POST(request: NextRequest) {
         break;
       case "triggerEvent":
         result = await triggerEvent(roomId, userId, event);
+        break;
+      case "endPlayerTurn":
+        result = await endPlayerTurn(roomId, userId);
         break;
       case "updateRoomConfig":
         result = await updateRoomConfig(roomId, userId, config);
