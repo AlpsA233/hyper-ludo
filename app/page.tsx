@@ -1335,7 +1335,7 @@ export default function App() {
                 }
 
                 // 调用 API 的 startGame 来获取服务器生成的 boardTiles
-                const startGameResponse = await fetch("/api/rooms", {
+                const startGameRes = await fetch("/api/rooms", {
                   method: "POST",
                   headers: {
                     "Content-Type": "application/json",
@@ -1345,8 +1345,17 @@ export default function App() {
                     action: "startGame",
                     roomId,
                   }),
-                }).then((res) => res.json());
+                });
 
+                if (!startGameRes.ok) {
+                  const errorData = await startGameRes.json();
+                  throw new Error(
+                    errorData.error ||
+                      `Failed to start game: ${startGameRes.status}`,
+                  );
+                }
+
+                const startGameResponse = await startGameRes.json();
                 const serverBoardTiles = startGameResponse.boardTiles;
                 console.log("✅ 游戏启动 - 从API获取服务器生成的boardTiles:", {
                   tilesCount: serverBoardTiles?.length || 0,

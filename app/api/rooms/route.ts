@@ -165,6 +165,8 @@ async function leaveRoom(roomId: string, userId: string) {
 
 // 开始游戏
 async function startGame(roomId: string, userId: string) {
+  console.log("🎮 startGame 调用:", { roomId, userId });
+
   // 验证用户是房间创建者
   const { data: room, error: roomError } = await supabaseAdmin
     .from("rooms")
@@ -173,8 +175,21 @@ async function startGame(roomId: string, userId: string) {
     .single();
 
   if (roomError || !room) {
-    throw new Error("Room not found");
+    console.error("❌ 房间查询失败:", {
+      roomId,
+      userId,
+      error: roomError?.message,
+      code: roomError?.code,
+      details: roomError?.details,
+    });
+    throw new Error(`Room not found: ${roomError?.message || "未知错误"}`);
   }
+
+  console.log("✅ 房间查询成功:", {
+    roomId,
+    creator_id: room.creator_id,
+    state: room.state,
+  });
 
   if (room.creator_id !== userId) {
     throw new Error("Only room creator can start game");
@@ -562,8 +577,9 @@ async function getRoomInfo(roomId: string, userId: string) {
 
 // API 请求处理器
 export async function POST(request: NextRequest) {
+  let body: any;
   try {
-    const body = await request.json();
+    body = await request.json();
     const {
       action,
       config,
@@ -578,7 +594,10 @@ export async function POST(request: NextRequest) {
 
     // 验证授权（从 Authorization header 获取用户信息）
     const authHeader = request.headers.get("Authorization");
+    console.log("🔐 Authorization header:", authHeader ? "存在" : "不存在");
+
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      console.error("❌ 缺少或格式错误的 Authorization header");
       return NextResponse.json(
         { error: "Missing authorization header" },
         { status: 401 },
@@ -587,16 +606,23 @@ export async function POST(request: NextRequest) {
 
     // 从 token 获取用户信息
     const token = authHeader.replace("Bearer ", "");
+    console.log("🔑 Token (前20字符):", token.substring(0, 20) + "...");
+
     const {
       data: { user },
       error: authError,
     } = await supabaseAdmin.auth.getUser(token);
 
     if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      console.error("❌ 认证失败:", authError?.message || "用户不存在");
+      return NextResponse.json(
+        { error: "Unauthorized", details: authError?.message },
+        { status: 401 },
+      );
     }
 
     const userId = user.id;
+    console.log("✅ 用户认证成功:", userId);
     let result;
 
     switch (action) {
@@ -636,7 +662,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (err: any) {
-    console.error("API Error:", err);
+    console.error("❌ API Error:", {
+      action: body?.action,
+      message: err.message,
+      stack: err.stack,
+    });
     return NextResponse.json(
       { error: err.message || "Internal server error" },
       { status: 400 },
