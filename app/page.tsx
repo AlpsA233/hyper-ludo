@@ -1248,17 +1248,21 @@ export default function App() {
                   );
                   // fallback: 本地更新
                   setTurn((turn + 1) % numPlayers);
+                  setHasUsedCard(false);
                 } else {
                   const data = await response.json();
                   console.log(
                     "✅ endPlayerTurn 成功，回合已更新到玩家:",
                     data.turn + 1,
                   );
+                  setTurn(data.turn);
+                  setHasUsedCard(false);
                 }
               } catch (err) {
                 console.error("❌ endPlayerTurn 异常:", err);
                 // fallback: 本地更新
                 setTurn((turn + 1) % numPlayers);
+                setHasUsedCard(false);
               }
             } else {
               setTurn((turn + 1) % numPlayers);
@@ -1344,17 +1348,21 @@ export default function App() {
                 );
                 // fallback: 本地更新
                 setTurn((turn + 1) % numPlayers);
+                setHasUsedCard(false);
               } else {
                 const data = await response.json();
                 console.log(
                   "✅ endPlayerTurn 成功，回合已更新到玩家:",
                   data.turn + 1,
                 );
+                setTurn(data.turn);
+                setHasUsedCard(false);
               }
             } catch (err) {
               console.error("❌ endPlayerTurn 异常:", err);
               // fallback: 本地更新
               setTurn((turn + 1) % numPlayers);
+              setHasUsedCard(false);
             }
           } else {
             setTurn((turn + 1) % numPlayers);
@@ -2100,14 +2108,27 @@ export default function App() {
                 }
               }
               // 清除事件并推进回合
-              await fetch("/api/rooms", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({ action: "endPlayerTurn", roomId }),
-              }).catch(console.error);
+              try {
+                const endRes = await fetch("/api/rooms", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({ action: "endPlayerTurn", roomId }),
+                });
+                if (endRes.ok) {
+                  const data = await endRes.json();
+                  setTurn(data.turn);
+                  setHasUsedCard(false);
+                } else {
+                  setTurn((turn + 1) % numPlayers);
+                  setHasUsedCard(false);
+                }
+              } catch {
+                setTurn((turn + 1) % numPlayers);
+                setHasUsedCard(false);
+              }
             };
 
             // 应用事件效果
