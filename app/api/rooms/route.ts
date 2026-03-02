@@ -170,7 +170,7 @@ async function startGame(roomId: string, userId: string) {
   // 验证用户是房间创建者
   const { data: room, error: roomError } = await supabaseAdmin
     .from("rooms")
-    .select("creator_id, state, num_players, event_density, total_steps")
+    .select("creator_id, state, num_players, event_density")
     .eq("id", roomId)
     .single();
 
@@ -200,7 +200,7 @@ async function startGame(roomId: string, userId: string) {
   }
 
   // 🔧 在服务器端生成boardTiles，确保所有玩家看到相同的棋盘
-  const totalSteps = room.total_steps || 40;
+  const totalSteps = 40; // Ludo 标准棋盘格子数
   const numPlayers = room.num_players || 2;
   const eventDensity = room.event_density || 40;
 
