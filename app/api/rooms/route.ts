@@ -239,14 +239,15 @@ async function startGame(roomId: string, userId: string) {
       .eq("room_id", roomId);
   }
 
-  // 返回room和boardTiles给客户端
-  return { room, boardTiles };
-
-  // 更新房间状态
-  await supabaseAdmin
+  // 更新房间状态为playing
+  const { error: updateError } = await supabaseAdmin
     .from("rooms")
     .update({ state: "playing" })
     .eq("id", roomId);
+
+  if (updateError) {
+    throw new Error(`Failed to update room state: ${updateError.message}`);
+  }
 
   // 获取完整房间信息
   const { data: players } = await supabaseAdmin
@@ -263,6 +264,7 @@ async function startGame(roomId: string, userId: string) {
   return {
     room: updatedRoom,
     players: players || [],
+    boardTiles,
   };
 }
 
