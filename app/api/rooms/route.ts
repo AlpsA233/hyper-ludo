@@ -172,7 +172,7 @@ async function startGame(roomId: string, userId: string) {
     .from("rooms")
     .select("creator_id, state, num_players, event_density")
     .eq("id", roomId)
-    .single();
+    .maybeSingle();
 
   if (roomError || !room) {
     console.error("❌ 房间查询失败:", {
@@ -271,13 +271,19 @@ async function startGame(roomId: string, userId: string) {
     .maybeSingle();
 
   if (!existingGame) {
-    await supabaseAdmin.from("room_games").insert({
-      room_id: roomId,
-      turn: 0,
-      phase: "playing",
-      logs: [],
-      board_tiles: boardTiles,
-    });
+    const { error: insertError } = await supabaseAdmin
+      .from("room_games")
+      .insert({
+        room_id: roomId,
+        turn: 0,
+        phase: "playing",
+        logs: [],
+        board_tiles: boardTiles,
+      });
+    if (insertError) {
+      console.error("❌ 创建 room_games 失败:", insertError);
+      throw new Error(`Failed to create game state: ${insertError.message}`);
+    }
   } else {
     // 重置游戏状态
     await supabaseAdmin
