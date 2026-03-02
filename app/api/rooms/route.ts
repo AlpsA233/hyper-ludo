@@ -207,11 +207,15 @@ async function startGame(roomId: string, userId: string) {
       throw new Error("You are not in this room");
     }
 
-    const { data: existingGame } = await supabaseAdmin
+    const { data: existingGame, error: gameError } = await supabaseAdmin
       .from("room_games")
       .select("board_tiles")
       .eq("room_id", roomId)
-      .single();
+      .maybeSingle();
+
+    if (gameError) {
+      console.warn("⚠️ 获取现有游戏状态时出错:", gameError.message);
+    }
 
     const { data: players } = await supabaseAdmin
       .from("room_players")
@@ -311,7 +315,7 @@ async function startGame(roomId: string, userId: string) {
     .from("rooms")
     .select("*")
     .eq("id", roomId)
-    .single();
+    .maybeSingle();
 
   return {
     room: updatedRoom,
@@ -337,11 +341,20 @@ async function rollDice(roomId: string, userId: string, diceCount: number) {
   }
 
   // 获取游戏状态
-  const { data: gameState } = await supabaseAdmin
+  const { data: gameState, error: gameStateError } = await supabaseAdmin
     .from("room_games")
     .select("turn")
     .eq("room_id", roomId)
-    .single();
+    .maybeSingle();
+
+  if (gameStateError) {
+    console.error("❌ 获取游戏状态失败:", gameStateError);
+    throw new Error(`Failed to get game state: ${gameStateError.message}`);
+  }
+
+  if (!gameState) {
+    throw new Error("Game state not found. Please start the game first.");
+  }
 
   console.log("📊 当前游戏状态:", gameState);
 
@@ -355,23 +368,25 @@ async function rollDice(roomId: string, userId: string, diceCount: number) {
   console.log("🎲 生成掷骰结果:", { diceValue, diceResults, diceCount });
 
   // 更新游戏状态
-  const { data: updatedGame, error: updateError } = await supabaseAdmin
+  const { error: updateError } = await supabaseAdmin
     .from("room_games")
     .update({
       dice_value: diceValue,
       dice_results: diceResults,
       phase: "moving",
     })
-    .eq("room_id", roomId)
-    .select()
-    .single();
+    .eq("room_id", roomId);
 
   if (updateError) {
     console.error("❌ 更新游戏状态失败:", updateError);
-    throw new Error(updateError.message);
+    throw new Error(`Failed to update game state: ${updateError.message}`);
   }
 
-  console.log("✅ 游戏状态已更新:", updatedGame);
+  console.log("✅ 游戏状态已更新:", {
+    diceValue,
+    diceResults,
+    phase: "moving",
+  });
 
   return {
     diceValue,
@@ -386,11 +401,12 @@ async function movePlayer(
   userId: string,
   position: number,
   lapCount: number,
+  targetPlayerIndex?: number,
 ) {
   // 验证玩家在房间中
   const { data: player } = await supabaseAdmin
     .from("room_players")
-    .select("id")
+    .select("id, player_index")
     .eq("room_id", roomId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -399,15 +415,19 @@ async function movePlayer(
     throw new Error("Not in this room");
   }
 
-  // 更新玩家位置
-  const { error: updateError } = await supabaseAdmin
+  // 确定要更新的目标玩家（可以是调用者自己，也可以是事件影响的其他玩家）
+  const updateQuery = supabaseAdmin
     .from("room_players")
     .update({
       position: position,
-      lap_count: lapCount,
+      lap: lapCount,
     })
-    .eq("room_id", roomId)
-    .eq("user_id", userId);
+    .eq("room_id", roomId);
+
+  const { error: updateError } =
+    targetPlayerIndex !== undefined
+      ? await updateQuery.eq("player_index", targetPlayerIndex)
+      : await updateQuery.eq("user_id", userId);
 
   if (updateError) {
     throw new Error(updateError.message);
@@ -441,20 +461,68 @@ async function triggerEvent(roomId: string, userId: string, event: any) {
   }
 
   // 更新游戏状态中的事件
-  const { data: updatedGame } = await supabaseAdmin
+  const { error: updateError } = await supabaseAdmin
     .from("room_games")
     .update({
       active_event: event,
       phase: "event",
     })
-    .eq("room_id", roomId)
-    .select()
-    .single();
+    .eq("room_id", roomId);
+
+  if (updateError) {
+    throw new Error(`Failed to update event: ${updateError.message}`);
+  }
 
   return {
     event,
     phase: "event",
   };
+}
+
+// 使用卡牌：广播卡牌效果到所有玩家（更新 room_players 位置/状态 + active_card）
+async function useCard(roomId: string, userId: string, cardEffect: any) {
+  // cardEffect: { card, playerUpdates: [{playerIndex, position, lap, skipTurn, restart}] }
+  const { data: player } = await supabaseAdmin
+    .from("room_players")
+    .select("player_index")
+    .eq("room_id", roomId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!player) {
+    throw new Error("Not in this room");
+  }
+
+  const { playerUpdates, card } = cardEffect;
+
+  // 批量更新受影响玩家位置
+  if (playerUpdates && playerUpdates.length > 0) {
+    for (const update of playerUpdates) {
+      const updateData: any = {};
+      if (update.position !== undefined) updateData.position = update.position;
+      if (update.lap !== undefined) updateData.lap = update.lap;
+      if (update.skipTurn !== undefined) updateData.skip_turn = update.skipTurn;
+
+      if (Object.keys(updateData).length > 0) {
+        await supabaseAdmin
+          .from("room_players")
+          .update(updateData)
+          .eq("room_id", roomId)
+          .eq("player_index", update.playerIndex);
+      }
+    }
+  }
+
+  // 更新 room_games 广播卡牌信息
+  await supabaseAdmin
+    .from("room_games")
+    .update({
+      active_card: card,
+      phase: "playing",
+    })
+    .eq("room_id", roomId);
+
+  return { success: true, playerUpdates };
 }
 
 // 完成当前玩家的回合，进入下一个玩家
@@ -474,25 +542,27 @@ async function endPlayerTurn(roomId: string, userId: string) {
   }
 
   // 获取房间配置
-  const { data: room } = await supabaseAdmin
+  const { data: room, error: roomError } = await supabaseAdmin
     .from("rooms")
     .select("num_players")
     .eq("id", roomId)
-    .single();
+    .maybeSingle();
 
-  if (!room) {
-    throw new Error("Room not found");
+  if (roomError || !room) {
+    throw new Error(`Room not found: ${roomError?.message || "Unknown error"}`);
   }
 
   // 获取当前游戏状态
-  const { data: gameState } = await supabaseAdmin
+  const { data: gameState, error: gameStateError } = await supabaseAdmin
     .from("room_games")
     .select("turn")
     .eq("room_id", roomId)
-    .single();
+    .maybeSingle();
 
-  if (!gameState) {
-    throw new Error("Game state not found");
+  if (gameStateError || !gameState) {
+    throw new Error(
+      `Game state not found: ${gameStateError?.message || "Unknown error"}`,
+    );
   }
 
   // 计算下一个玩家的索引
@@ -504,22 +574,22 @@ async function endPlayerTurn(roomId: string, userId: string) {
     numPlayers: room.num_players,
   });
 
-  // 更新游戏状态：重置掷骰数据，更新turn
-  const { data: updatedGame, error: updateError } = await supabaseAdmin
+  // 更新游戏状态：重置掷骰数据，更新turn，清除事件
+  const { error: updateError } = await supabaseAdmin
     .from("room_games")
     .update({
       turn: nextTurn,
       dice_value: null,
       dice_results: null,
+      active_event: null,
+      active_card: null,
       phase: "playing",
     })
-    .eq("room_id", roomId)
-    .select()
-    .single();
+    .eq("room_id", roomId);
 
   if (updateError) {
     console.error("❌ 更新游戏状态失败:", updateError);
-    throw new Error(updateError.message);
+    throw new Error(`Failed to update game state: ${updateError.message}`);
   }
 
   console.log("✅ 回合已更新到玩家:", nextTurn + 1);
@@ -530,6 +600,23 @@ async function endPlayerTurn(roomId: string, userId: string) {
   };
 }
 
+// 广播胜利者
+async function setWinner(roomId: string, userId: string, winnerIndex: number) {
+  // 更新游戏状态为胜利
+  await supabaseAdmin
+    .from("room_games")
+    .update({ phase: "win", active_card: { winnerIndex } })
+    .eq("room_id", roomId);
+
+  // 更新房间状态为已完成
+  await supabaseAdmin
+    .from("rooms")
+    .update({ state: "finished" })
+    .eq("id", roomId);
+
+  return { winnerIndex, phase: "win" };
+}
+
 // 更新房间配置（仅房间创建者可以，且仅在游戏未开始时）
 async function updateRoomConfig(roomId: string, userId: string, config: any) {
   // 验证用户是房间创建者
@@ -537,10 +624,10 @@ async function updateRoomConfig(roomId: string, userId: string, config: any) {
     .from("rooms")
     .select("creator_id, state, current_players")
     .eq("id", roomId)
-    .single();
+    .maybeSingle();
 
   if (roomError || !room) {
-    throw new Error("Room not found");
+    throw new Error(`Room not found: ${roomError?.message || "Unknown error"}`);
   }
 
   if (room.creator_id !== userId) {
@@ -559,7 +646,7 @@ async function updateRoomConfig(roomId: string, userId: string, config: any) {
   }
 
   // 更新房间配置
-  const { data: updatedRoom, error: updateError } = await supabaseAdmin
+  const { error: updateError } = await supabaseAdmin
     .from("rooms")
     .update({
       num_players: config.num_players,
@@ -568,12 +655,23 @@ async function updateRoomConfig(roomId: string, userId: string, config: any) {
       initial_cards: config.initial_cards,
       event_density: config.event_density,
     })
-    .eq("id", roomId)
-    .select()
-    .single();
+    .eq("id", roomId);
 
   if (updateError) {
-    throw new Error(updateError.message);
+    throw new Error(`Failed to update config: ${updateError.message}`);
+  }
+
+  // 获取更新后的房间信息
+  const { data: updatedRoom, error: fetchError } = await supabaseAdmin
+    .from("rooms")
+    .select("*")
+    .eq("id", roomId)
+    .maybeSingle();
+
+  if (fetchError || !updatedRoom) {
+    throw new Error(
+      `Failed to fetch updated room: ${fetchError?.message || "Unknown error"}`,
+    );
   }
 
   return updatedRoom;
@@ -594,11 +692,15 @@ async function getRoomInfo(roomId: string, userId: string) {
   }
 
   // 获取房间信息
-  const { data: room } = await supabaseAdmin
+  const { data: room, error: roomError } = await supabaseAdmin
     .from("rooms")
     .select("*")
     .eq("id", roomId)
-    .single();
+    .maybeSingle();
+
+  if (roomError || !room) {
+    throw new Error(`Room not found: ${roomError?.message || "Unknown error"}`);
+  }
 
   // 获取所有玩家（无 RLS 限制）
   const { data: players } = await supabaseAdmin
@@ -627,6 +729,9 @@ export async function POST(request: NextRequest) {
       position,
       lapCount,
       event,
+      cardEffect,
+      targetPlayerIndex,
+      winnerIndex,
     } = body;
 
     // 验证授权（从 Authorization header 获取用户信息）
@@ -682,10 +787,22 @@ export async function POST(request: NextRequest) {
         result = await rollDice(roomId, userId, diceCount);
         break;
       case "movePlayer":
-        result = await movePlayer(roomId, userId, position, lapCount);
+        result = await movePlayer(
+          roomId,
+          userId,
+          position,
+          lapCount,
+          targetPlayerIndex,
+        );
         break;
       case "triggerEvent":
         result = await triggerEvent(roomId, userId, event);
+        break;
+      case "useCard":
+        result = await useCard(roomId, userId, cardEffect);
+        break;
+      case "setWinner":
+        result = await setWinner(roomId, userId, winnerIndex);
         break;
       case "endPlayerTurn":
         result = await endPlayerTurn(roomId, userId);

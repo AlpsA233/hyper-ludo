@@ -53,6 +53,9 @@ export interface RoomPlayer {
   color_index: number;
   position: number;
   lap: number;
+  skip_turn?: boolean;
+  cards?: any[];
+  shield?: boolean;
 }
 
 interface UseRoomReturn {

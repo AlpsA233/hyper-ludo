@@ -336,7 +336,12 @@ export default function App() {
   // 多人游戏：订阅房间 Realtime 更新
   // 建立 Realtime 订阅 - 仅在 roomId 变化时
   useEffect(() => {
-    if (!roomId) return;
+    if (!roomId) {
+      // 🔧 当离开多人游戏房间时，重置多人游戏状态
+      setIsMultiplayer(false);
+      setCurrentPlayerIndex(null);
+      return;
+    }
 
     console.log("🔌 订阅房间 Realtime:", roomId);
     setIsMultiplayer(true);
@@ -347,6 +352,9 @@ export default function App() {
     return () => {
       console.log("❌ 取消 Realtime 订阅:", roomId);
       unsubscribe();
+      // 🔧 取消订阅时重置多人游戏状态
+      setIsMultiplayer(false);
+      setCurrentPlayerIndex(null);
     };
   }, [roomId, subscribe]);
 
@@ -534,6 +542,54 @@ export default function App() {
         `Player ${gameState.turn + 1} rolled ${gameState.dice_results?.length === 1 ? gameState.dice_value : gameState.dice_results?.join(", ") + ` (总计: ${gameState.dice_value})`}`,
       );
     }
+
+    // 同步事件：非当前回合玩家收到事件弹窗
+    if (gameState.phase === "event" && gameState.active_event) {
+      // 非操作玩家：显示事件弹窗（操作玩家已在本地触发）
+      if (currentPlayerIndex !== gameState.turn) {
+        console.log(
+          "📍 [Event Sync] 非操作玩家收到事件:",
+          gameState.active_event,
+        );
+        setActiveEvent({
+          id: gameState.active_event.id,
+          text: gameState.active_event.text,
+          type: gameState.active_event.type,
+          val: gameState.active_event.val,
+          target: gameState.active_event.target || "SELF",
+          color: gameState.active_event.color || "#8b5cf6",
+        });
+        setPhase("event");
+      }
+    }
+
+    // 事件已清除：重置事件弹窗
+    if (
+      gameState.phase === "playing" &&
+      !gameState.active_event &&
+      activeEvent
+    ) {
+      console.log("📍 [Event Cleared] 服务器清除事件，关闭本地弹窗");
+      setActiveEvent(null);
+      if (phase === "event") setPhase("playing");
+    }
+
+    // 胜利同步：非操作玩家收到胜利通知
+    if (
+      gameState.phase === "win" &&
+      gameState.active_card?.winnerIndex !== undefined
+    ) {
+      const wIdx = gameState.active_card.winnerIndex;
+      console.log("🏆 [Win Sync] 胜利玩家:", wIdx + 1);
+      setPlayers((prev) => {
+        const winner = prev[wIdx];
+        if (winner) {
+          setWinner(winner);
+          setPhase("win");
+        }
+        return prev;
+      });
+    }
   }, [gameState, isMultiplayer, isMoving, isRolling]);
 
   // 多人游戏：同步房间玩家数据到游戏显示（用于左侧玩家部分）
@@ -541,14 +597,36 @@ export default function App() {
     if (!isMultiplayer || !roomPlayers || roomPlayers.length === 0) return;
 
     // 仅在游戏进行中时同步玩家信息
-    if (phase === "playing") {
+    if (phase === "playing" || phase === "event") {
       console.log(
         "👥 同步房间玩家数据到游戏显示:",
         roomPlayers.length,
         "位玩家",
       );
-      // 这里不更新 players，因为 players 是游戏逻辑中的玩家状态
-      // 而是确保 PlayerSidebar 显示的数据来自正确的来源
+
+      // 把 roomPlayers（来自 Realtime）同步到本地 players 状态（位置、圈数、skipTurn）
+      // 仅同步非当前操作玩家（操作方自己已由本地状态管理动画）
+      setPlayers((prev) => {
+        if (prev.length === 0) return prev;
+        const next = [...prev];
+        roomPlayers.forEach((rp) => {
+          const idx = rp.player_index;
+          if (idx < 0 || idx >= next.length) return;
+          // 跳过当前正在移动的玩家（由本地动画驱动，避免冲突）
+          if (isMoving && idx === turn) return;
+          const existingPlayer = next[idx];
+          if (!existingPlayer) return;
+          next[idx] = {
+            ...existingPlayer,
+            pos: rp.position ?? existingPlayer.pos,
+            lap: rp.lap ?? existingPlayer.lap,
+            skipTurn: rp.skip_turn ?? existingPlayer.skipTurn,
+            cards:
+              rp.cards && rp.cards.length > 0 ? rp.cards : existingPlayer.cards,
+          };
+        });
+        return next;
+      });
     }
   }, [roomPlayers, isMultiplayer, phase]);
 
@@ -576,6 +654,11 @@ export default function App() {
   // --- 游戏逻辑 ---
   const startGame = () => {
     if (userData.eventDatabase.length === 0) return alert(t.game.noEventsAlert);
+
+    // 🔧 确保重置多人游戏状态（离线模式不使用多人游戏逻辑）
+    setIsMultiplayer(false);
+    setCurrentPlayerIndex(null);
+    setRoomId(null);
 
     // 重置事件计数
     setEventCounts({});
@@ -691,20 +774,37 @@ export default function App() {
     // 用于显示emoji的延迟时间
     const newCardEffectDisplay = { ...cardEffectDisplay };
 
+    // 收集需要广播的玩家更新（用于多人游戏同步）
+    const playerUpdates: Array<{
+      playerIndex: number;
+      position?: number;
+      lap?: number;
+      skipTurn?: boolean;
+    }> = [];
+
     targets.forEach((tid) => {
       const t = newPlayers[tid];
       let hideTime = Date.now() + 1000; // 默认1秒显示
+      const update: {
+        playerIndex: number;
+        position?: number;
+        lap?: number;
+        skipTurn?: boolean;
+      } = { playerIndex: tid };
 
       if (card.effect.move) {
         // 使用统一的位置计算函数
         const newPosition = calculateNewPosition(t, card.effect.move);
         t.pos = newPosition.pos;
         t.lap = newPosition.lap;
+        update.position = newPosition.pos;
+        update.lap = newPosition.lap;
         // 移动卡牌：走完后显示1秒（约750ms的动画+250ms延迟）
         hideTime = Date.now() + 1750;
       }
       if (card.effect.skip) {
         t.skipTurn = true;
+        update.skipTurn = true;
         // 暂停卡牌：需要等暂停结束后再消失
         // 设置较长时间，实际消失会在skipTurn结束时处理
         hideTime = Date.now() + 300000; // 5分钟，足以等待暂停结束
@@ -712,9 +812,13 @@ export default function App() {
       if (card.effect.restart) {
         t.pos = -1;
         t.lap = 0;
+        update.position = -1;
+        update.lap = 0;
         // 重启卡牌：走完后显示1秒
         hideTime = Date.now() + 1750;
       }
+
+      playerUpdates.push(update);
 
       // 显示卡牌emoji
       newCardEffectDisplay[tid] = {
@@ -728,6 +832,25 @@ export default function App() {
     setPickingTargetFor(null);
     setShowCardDrawer(false);
     setHasUsedCard(true);
+
+    // 多人游戏：同步卡牌效果到服务器
+    if (isMultiplayer && roomId) {
+      supabase.auth.getSession().then(({ data }) => {
+        const token = data.session?.access_token || "";
+        fetch("/api/rooms", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            action: "useCard",
+            roomId,
+            cardEffect: { card, playerUpdates },
+          }),
+        }).catch((err) => console.error("❌ useCard同步失败:", err));
+      });
+    }
 
     // 如果是对自己使用移动卡牌，播放移动动画
     if (card.target === "SELF" && card.effect.move) {
@@ -984,7 +1107,34 @@ export default function App() {
     // 使用统一的位置计算函数
     const { pos: finalPos, lap: newLap } = calculateNewPosition(p, steps);
 
+    // 多人游戏：先同步位置到服务器，其他玩家通过 roomPlayers Realtime 收到更新
+    const syncPositionToServer = async () => {
+      if (isMultiplayer && roomId) {
+        try {
+          const token =
+            (await supabase.auth.getSession())?.data.session?.access_token ||
+            "";
+          await fetch("/api/rooms", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              action: "movePlayer",
+              roomId,
+              position: finalPos,
+              lapCount: newLap,
+            }),
+          });
+        } catch (err) {
+          console.error("❌ movePlayer同步失败:", err);
+        }
+      }
+    };
+
     animatePieceMove(turn, () => {
+      let hasWon = false;
       setPlayers((prev) => {
         const next = [...prev];
         const curr = {
@@ -993,6 +1143,7 @@ export default function App() {
           lap: newLap,
         };
         if (curr.lap >= lapsToWin) {
+          hasWon = true;
           setWinner(curr);
           setPhase("win");
           return next;
@@ -1002,6 +1153,41 @@ export default function App() {
         return next;
       });
       addLog(`Player ${turn + 1} moved to pos ${finalPos} (lap ${newLap})`);
+      // 同步位置到服务器（包含胜利状态）
+      if (hasWon && isMultiplayer && roomId) {
+        supabase.auth.getSession().then(async ({ data }) => {
+          const token = data.session?.access_token || "";
+          // 更新位置
+          await fetch("/api/rooms", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              action: "movePlayer",
+              roomId,
+              position: finalPos,
+              lapCount: newLap,
+            }),
+          }).catch(console.error);
+          // 广播胜利
+          await fetch("/api/rooms", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              action: "setWinner",
+              roomId,
+              winnerIndex: turn,
+            }),
+          }).catch(console.error);
+        });
+      } else {
+        syncPositionToServer();
+      }
       // 事件触发: 只在CUSTOM格子上触发
       const isCustomTile =
         finalPos !== -1 && boardTiles[finalPos]?.id === "CUSTOM";
@@ -1103,6 +1289,32 @@ export default function App() {
             color: event.color || "#8b5cf6",
           });
           setPhase("event");
+
+          // 多人游戏：广播事件到服务器让其他玩家看到弹窗
+          if (isMultiplayer && roomId) {
+            const token =
+              (await supabase.auth.getSession())?.data.session?.access_token ||
+              "";
+            fetch("/api/rooms", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                action: "triggerEvent",
+                roomId,
+                event: {
+                  id: event.id,
+                  text: event.text,
+                  type: event.type,
+                  val: event.val,
+                  target: event.target || "SELF",
+                  color: event.color || "#8b5cf6",
+                },
+              }),
+            }).catch((err) => console.error("❌ triggerEvent同步失败:", err));
+          }
         }, 400);
       } else {
         setTimeout(async () => {
@@ -1826,8 +2038,15 @@ export default function App() {
 
         <EventModal
           activeEvent={activeEvent}
-          applyEventEffect={() => {
+          applyEventEffect={async () => {
             if (!activeEvent) return;
+
+            // 多人游戏：非回合玩家不能确认事件（只能观看）
+            if (isMultiplayer && currentPlayerIndex !== turn) {
+              addLog(`⏳ 等待玩家 ${turn + 1} 处理事件...`);
+              return;
+            }
+
             // 确定受影响的玩家索引
             const getAffectedPlayerIndices = (): number[] => {
               const target = activeEvent.target || "SELF";
@@ -1848,10 +2067,58 @@ export default function App() {
 
             const affectedIndices = getAffectedPlayerIndices();
 
+            // 多人游戏：事件效果后同步位置并推进回合的辅助函数
+            const syncEventAndEndTurn = async (
+              updatedPositions: Array<{
+                playerIndex: number;
+                position?: number;
+                lap?: number;
+                skipTurn?: boolean;
+              }>,
+            ) => {
+              if (!isMultiplayer || !roomId) return;
+              const token =
+                (await supabase.auth.getSession())?.data.session
+                  ?.access_token || "";
+              // 批量同步受影响玩家位置
+              for (const upd of updatedPositions) {
+                if (upd.position !== undefined || upd.skipTurn !== undefined) {
+                  await fetch("/api/rooms", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                      action: "movePlayer",
+                      roomId,
+                      position: upd.position,
+                      lapCount: upd.lap,
+                      targetPlayerIndex: upd.playerIndex,
+                    }),
+                  }).catch(console.error);
+                }
+              }
+              // 清除事件并推进回合
+              await fetch("/api/rooms", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ action: "endPlayerTurn", roomId }),
+              }).catch(console.error);
+            };
+
             // 应用事件效果
             if (activeEvent.type === "MOVE" && activeEvent.val !== 0) {
               // 移动效果：更新受影响玩家的位置
               // 为避免多玩家依赖问题，对每个玩家都基于原始状态计算
+              const newPositions: Array<{
+                playerIndex: number;
+                position: number;
+                lap: number;
+              }> = [];
               setPlayers((prev) => {
                 const next = [...prev];
                 affectedIndices.forEach((idx) => {
@@ -1865,6 +2132,11 @@ export default function App() {
                     pos: newPosition.pos,
                     lap: newPosition.lap,
                   };
+                  newPositions.push({
+                    playerIndex: idx,
+                    position: newPosition.pos,
+                    lap: newPosition.lap,
+                  });
                 });
                 return next;
               });
@@ -1872,9 +2144,13 @@ export default function App() {
                 `Event: ${affectedIndices.map((i) => `Player ${i + 1}`).join(", ")} moved ${activeEvent.val > 0 ? "+" : ""}${activeEvent.val}`,
               );
               // 播放移动动画（只播放当前玩家或第一个受影响玩家）
-              animatePieceMove(affectedIndices[0] ?? turn, () => {
+              animatePieceMove(affectedIndices[0] ?? turn, async () => {
                 setPhase("playing");
-                setTurn((turn + 1) % numPlayers);
+                if (!isMultiplayer || !roomId) {
+                  setTurn((turn + 1) % numPlayers);
+                } else {
+                  await syncEventAndEndTurn(newPositions);
+                }
                 setIsMoving(false);
                 setActiveEvent(null);
                 setHasUsedCard(false);
@@ -1892,12 +2168,26 @@ export default function App() {
                 `Event: ${affectedIndices.map((i) => `Player ${i + 1}`).join(", ")} will skip next turn`,
               );
               setPhase("playing");
-              setTurn((turn + 1) % numPlayers);
+              if (!isMultiplayer || !roomId) {
+                setTurn((turn + 1) % numPlayers);
+              } else {
+                await syncEventAndEndTurn(
+                  affectedIndices.map((idx) => ({
+                    playerIndex: idx,
+                    skipTurn: true,
+                  })),
+                );
+              }
               setIsMoving(false);
               setActiveEvent(null);
               setHasUsedCard(false);
             } else if (activeEvent.type === "RESTART_LAP") {
               // 回到本圈起点
+              const newPositions: Array<{
+                playerIndex: number;
+                position: number;
+                lap: number;
+              }> = [];
               setPlayers((prev) => {
                 const next = [...prev];
                 affectedIndices.forEach((idx) => {
@@ -1910,6 +2200,11 @@ export default function App() {
                     ...next[idx],
                     pos: lapStartPos,
                   };
+                  newPositions.push({
+                    playerIndex: idx,
+                    position: lapStartPos,
+                    lap: currentPlayer.lap,
+                  });
                 });
                 return next;
               });
@@ -1917,9 +2212,13 @@ export default function App() {
                 `Event: ${affectedIndices.map((i) => `Player ${i + 1}`).join(", ")} returned to lap start`,
               );
               // 播放移动动画
-              animatePieceMove(affectedIndices[0] ?? turn, () => {
+              animatePieceMove(affectedIndices[0] ?? turn, async () => {
                 setPhase("playing");
-                setTurn((turn + 1) % numPlayers);
+                if (!isMultiplayer || !roomId) {
+                  setTurn((turn + 1) % numPlayers);
+                } else {
+                  await syncEventAndEndTurn(newPositions);
+                }
                 setIsMoving(false);
                 setActiveEvent(null);
                 setHasUsedCard(false);
@@ -1928,7 +2227,11 @@ export default function App() {
               // NONE 类型或其他：无游戏效果
               addLog(`Event: ${activeEvent.text}`);
               setPhase("playing");
-              setTurn((turn + 1) % numPlayers);
+              if (!isMultiplayer || !roomId) {
+                setTurn((turn + 1) % numPlayers);
+              } else {
+                await syncEventAndEndTurn([]);
+              }
               setIsMoving(false);
               setActiveEvent(null);
               setHasUsedCard(false);
@@ -1952,6 +2255,10 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => {
+                    // 🔧 退出游戏时清理多人游戏状态
+                    setRoomId(null);
+                    setIsMultiplayer(false);
+                    setCurrentPlayerIndex(null);
                     setPhase("setup");
                     setShowExitConfirm(false);
                   }}
