@@ -361,6 +361,111 @@ export default function App() {
     }
   }, [roomPlayers, user?.id, room, roomId]);
 
+  // 检测房间状态变化：如果房间状态变为 "playing" 且客户端还在 lobby，自动启动游戏
+  useEffect(() => {
+    if (!room || !roomId || phase !== "room_lobby") return;
+
+    if (room.state === "playing") {
+      console.log("🎮 检测到房间已开始，自动加载游戏状态");
+
+      // 调用 API 获取游戏状态和 boardTiles
+      const loadGameState = async () => {
+        try {
+          const token =
+            (await supabase.auth.getSession())?.data.session?.access_token ||
+            "";
+
+          // 获取 boardTiles 和房间信息
+          const response = await fetch("/api/rooms", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              action: "startGame",
+              roomId,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Failed to load game state: ${response.status}`);
+          }
+
+          const data = await response.json();
+          const {
+            room: updatedRoom,
+            players: updatedPlayers,
+            boardTiles: serverBoardTiles,
+          } = data;
+
+          console.log("✅ 游戏状态加载成功", {
+            boardTiles: serverBoardTiles?.length,
+            players: updatedPlayers?.length,
+          });
+
+          // 初始化游戏配置
+          if (updatedRoom) {
+            setNumPlayers(updatedRoom.num_players);
+            setDiceCount(updatedRoom.dice_count);
+            setLapsToWin(updatedRoom.laps_to_win);
+            setInitialCards(updatedRoom.initial_cards);
+            setEventDensity(updatedRoom.event_density);
+          }
+
+          // 初始化玩家数据
+          if (updatedPlayers && updatedPlayers.length > 0) {
+            const gamePlayers: Player[] = updatedPlayers
+              .sort((a: any, b: any) => a.player_index - b.player_index)
+              .map((rp: any) => ({
+                id: rp.player_index,
+                color: COLORS[rp.color_index % COLORS.length],
+                pos: -1,
+                lap: 0,
+                startPos: 0,
+                shield: false,
+                skipTurn: false,
+                cards: Array.from({
+                  length: updatedRoom?.initial_cards || initialCards,
+                }).map(() => {
+                  const baseCard =
+                    userData.cardDatabase[
+                      Math.floor(Math.random() * userData.cardDatabase.length)
+                    ];
+                  return {
+                    id: baseCard.id,
+                    rarity: baseCard.rarity as "NR" | "R" | "SR" | "SSR",
+                    name: baseCard.name,
+                    desc: baseCard.desc,
+                    pattern: baseCard.pattern,
+                    target: baseCard.target,
+                    effect: baseCard.effect,
+                  } as Card;
+                }),
+                avatar:
+                  rp.avatar || ["🔵", "🟣", "🟡", "🟢"][rp.player_index % 4],
+                name: rp.player_name || `Player ${rp.player_index + 1}`,
+              }));
+            setPlayers(gamePlayers);
+            setTurn(0);
+          }
+
+          // 设置 boardTiles
+          if (serverBoardTiles && serverBoardTiles.length > 0) {
+            setBoardTiles(serverBoardTiles);
+          }
+
+          // 切换到游戏阶段
+          setPhase("playing");
+        } catch (error) {
+          console.error("❌ 加载游戏状态失败:", error);
+        }
+      };
+
+      loadGameState();
+    }
+  }, [room?.state, roomId, phase, supabase, userData, initialCards]);
+
   // 多人游戏：当 gameState 变化时，同步本地状态
   useEffect(() => {
     if (!gameState || !isMultiplayer) return;

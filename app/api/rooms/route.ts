@@ -195,8 +195,31 @@ async function startGame(roomId: string, userId: string) {
     throw new Error("Only room creator can start game");
   }
 
+  // 如果游戏已经开始，返回现有的游戏状态和棋盘
   if (room.state === "playing") {
-    throw new Error("Game already started");
+    console.log("⚠️ 游戏已经开始，返回现有游戏状态");
+    const { data: existingGame } = await supabaseAdmin
+      .from("room_games")
+      .select("board_tiles")
+      .eq("room_id", roomId)
+      .single();
+
+    const { data: players } = await supabaseAdmin
+      .from("room_players")
+      .select("*")
+      .eq("room_id", roomId);
+
+    const { data: updatedRoom } = await supabaseAdmin
+      .from("rooms")
+      .select("*")
+      .eq("id", roomId)
+      .single();
+
+    return {
+      room: updatedRoom,
+      players: players || [],
+      boardTiles: existingGame?.board_tiles || [],
+    };
   }
 
   // 🔧 在服务器端生成boardTiles，确保所有玩家看到相同的棋盘
