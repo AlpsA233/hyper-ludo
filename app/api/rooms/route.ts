@@ -191,13 +191,22 @@ async function startGame(roomId: string, userId: string) {
     state: room.state,
   });
 
-  if (room.creator_id !== userId) {
-    throw new Error("Only room creator can start game");
-  }
-
-  // 如果游戏已经开始，返回现有的游戏状态和棋盘
+  // 如果游戏已经开始，任何房间内的玩家都可以获取游戏状态
   if (room.state === "playing") {
     console.log("⚠️ 游戏已经开始，返回现有游戏状态");
+
+    // 验证用户是否在房间中
+    const { data: playerInRoom } = await supabaseAdmin
+      .from("room_players")
+      .select("id")
+      .eq("room_id", roomId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (!playerInRoom) {
+      throw new Error("You are not in this room");
+    }
+
     const { data: existingGame } = await supabaseAdmin
       .from("room_games")
       .select("board_tiles")
@@ -220,6 +229,11 @@ async function startGame(roomId: string, userId: string) {
       players: players || [],
       boardTiles: existingGame?.board_tiles || [],
     };
+  }
+
+  // 游戏还没开始时，只有创建者可以启动游戏
+  if (room.creator_id !== userId) {
+    throw new Error("Only room creator can start game");
   }
 
   // 🔧 在服务器端生成boardTiles，确保所有玩家看到相同的棋盘
