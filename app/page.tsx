@@ -192,6 +192,8 @@ export default function App() {
   const diceRefs = useRef<(HTMLDivElement | null)[]>([]);
   const piecesRef = useRef<(HTMLDivElement | null)[]>([]);
   const logsContainerRef = useRef<HTMLDivElement>(null);
+  // 用于防止多人游戏中重复播放同一次掷骰动画
+  const lastAnimatedDiceRef = useRef<string | null>(null);
 
   // 摇一摇掷骰子（只在游戏中且没有弹窗时启用）
   const {
@@ -534,15 +536,35 @@ export default function App() {
 
     // 如果掷骰完成，更新 phase 为 "moving"
     if (gameState.phase === "moving" && !isMoving && !isRolling) {
-      // 其他玩家看到掷骰结果，不再显示动画
-      console.log(
-        "📍 [Phase Moving] 其他玩家看到掷骰结果:",
-        gameState.dice_value,
-        gameState.dice_results,
-      );
-      addLog(
-        `Player ${gameState.turn + 1} rolled ${gameState.dice_results?.length === 1 ? gameState.dice_value : gameState.dice_results?.join(", ") + ` (总计: ${gameState.dice_value})`}`,
-      );
+      const results = gameState.dice_results;
+      const value = gameState.dice_value;
+
+      // 非操作玩家：播放骰子动画
+      if (
+        currentPlayerIndex !== gameState.turn &&
+        results &&
+        results.length > 0
+      ) {
+        const animKey = `${gameState.turn}_${JSON.stringify(results)}`;
+        if (lastAnimatedDiceRef.current !== animKey) {
+          lastAnimatedDiceRef.current = animKey;
+          console.log(
+            "🎲 [非操作玩家] 播放掷骰动画:",
+            results,
+            "总计:",
+            value,
+          );
+          setIsRolling(true);
+          animateDiceRoll(results).then(() => {
+            setDiceValue(value);
+            setDiceResults(results);
+            addLog(
+              `Player ${gameState.turn + 1} rolled ${results.length === 1 ? value : results.join(", ") + ` (总计: ${value})`}`,
+            );
+            setIsRolling(false);
+          });
+        }
+      }
     }
 
     // 同步事件：非当前回合玩家收到事件弹窗
@@ -735,7 +757,7 @@ export default function App() {
         color: COLORS[i],
         pos: -1,
         lap: 0,
-        startPos: Math.floor(totalSteps / numPlayers) * i, // 记录每个玩家的起始位置
+        startPos: 0, // 所有玩家从同一起点出发，方向一致
         shield: false,
         skipTurn: false,
         avatar: userData.playerAvatars[i] || "👤", // 应用玩家头像设置
