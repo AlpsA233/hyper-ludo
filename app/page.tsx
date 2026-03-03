@@ -405,6 +405,7 @@ export default function App() {
             room: updatedRoom,
             players: updatedPlayers,
             boardTiles: serverBoardTiles,
+            currentTurn: serverTurn,
           } = data;
 
           console.log("✅ 游戏状态加载成功", {
@@ -455,7 +456,8 @@ export default function App() {
                 name: rp.player_name || `Player ${rp.player_index + 1}`,
               }));
             setPlayers(gamePlayers);
-            setTurn(0);
+            // 从服务器获取当前回合（避免重连时从 0 开始）
+            setTurn(serverTurn ?? 0);
           }
 
           // 设置 boardTiles
@@ -629,6 +631,49 @@ export default function App() {
       });
     }
   }, [roomPlayers, isMultiplayer, phase]);
+
+  // 多人游戏：定期轮询 room_games 确保 turn 同步（作为 Realtime 的可靠备份）
+  // 解决 Realtime 未能送达时 Player 2 看不到回合更新的问题
+  useEffect(() => {
+    if (!isMultiplayer || !roomId || phase !== "playing") return;
+
+    const pollGameState = async () => {
+      // 正在掷骰或移动中，跳过以避免干扰动画
+      if (isRolling || isMoving) return;
+
+      try {
+        const token =
+          (await supabase.auth.getSession())?.data.session?.access_token || "";
+        const response = await fetch("/api/rooms", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ action: "getGameState", roomId }),
+        });
+
+        if (!response.ok) return;
+
+        const { gameState: remoteState } = await response.json();
+        if (!remoteState) return;
+
+        // 如果服务器 turn 与本地不一致，强制同步
+        if (remoteState.turn !== undefined && remoteState.turn !== turn) {
+          console.log(
+            `🔄 [Poll] 游戏回合同步: ${turn} → ${remoteState.turn}`,
+          );
+          setTurn(remoteState.turn);
+          setHasUsedCard(false);
+        }
+      } catch {
+        // 轮询失败静默忽略，Realtime 可能仍在工作
+      }
+    };
+
+    const interval = setInterval(pollGameState, 2000);
+    return () => clearInterval(interval);
+  }, [isMultiplayer, roomId, phase, isRolling, isMoving, turn]);
 
   const totalSteps = useMemo(() => numPlayers * 10, [numPlayers]);
   const center = { x: 400, y: 400 };

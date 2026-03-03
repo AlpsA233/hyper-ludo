@@ -209,7 +209,7 @@ async function startGame(roomId: string, userId: string) {
 
     const { data: existingGame, error: gameError } = await supabaseAdmin
       .from("room_games")
-      .select("board_tiles")
+      .select("*")
       .eq("room_id", roomId)
       .maybeSingle();
 
@@ -232,6 +232,8 @@ async function startGame(roomId: string, userId: string) {
       room: updatedRoom,
       players: players || [],
       boardTiles: existingGame?.board_tiles || [],
+      currentTurn: existingGame?.turn ?? 0,
+      currentPhase: existingGame?.phase ?? "playing",
     };
   }
 
@@ -683,6 +685,33 @@ async function updateRoomConfig(roomId: string, userId: string, config: any) {
   return updatedRoom;
 }
 
+// 获取当前游戏状态（轮询用，作为 Realtime 的可靠备份）
+async function getGameState(roomId: string, userId: string) {
+  // 验证玩家在房间中
+  const { data: player } = await supabaseAdmin
+    .from("room_players")
+    .select("id")
+    .eq("room_id", roomId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!player) {
+    throw new Error("Not in this room");
+  }
+
+  const { data: gameState, error } = await supabaseAdmin
+    .from("room_games")
+    .select("*")
+    .eq("room_id", roomId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to get game state: ${error.message}`);
+  }
+
+  return { gameState };
+}
+
 // 获取房间信息（用于重新连接）
 async function getRoomInfo(roomId: string, userId: string) {
   // 验证玩家是否在房间中
@@ -785,6 +814,9 @@ export async function POST(request: NextRequest) {
         break;
       case "getRoomInfo":
         result = await getRoomInfo(roomId, userId);
+        break;
+      case "getGameState":
+        result = await getGameState(roomId, userId);
         break;
       case "startGame":
         result = await startGame(roomId, userId);
