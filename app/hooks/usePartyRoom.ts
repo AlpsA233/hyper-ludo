@@ -137,10 +137,16 @@ export function usePartyRoom(roomId: string | null): UsePartyRoomReturn {
       case "dice_rolled": {
         const p = data.payload as any;
         console.log("[Ably] dice_rolled payload:", JSON.stringify(p));
+        
+        // Defensive: ensure diceResults is never empty if diceValue > 0
+        const diceResults = Array.isArray(p.diceResults) && p.diceResults.length > 0 
+          ? p.diceResults 
+          : [p.diceValue].filter(v => v > 0);
+        
         setRoomState(prev => prev ? {
           ...prev,
           diceValue: p.diceValue,
-          diceResults: p.diceResults,
+          diceResults,
           diceRollerIndex: p.playerIndex,
           currentTurn: p.currentTurn,
           phase: p.phase as any,
