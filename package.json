@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:party": "partykit dev",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:party\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -13,6 +15,7 @@
     "@vercel/kv": "^3.0.0",
     "lucide-react": "^0.574.0",
     "next": "16.1.6",
+    "partykit": "^0.0.115",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },

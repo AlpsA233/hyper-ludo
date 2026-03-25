@@ -1,0 +1,4 @@
+{
+  "name": "hyper-ludo",
+  "main": "party/index.ts"
+}

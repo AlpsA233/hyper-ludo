@@ -1,2 +1,18 @@
 schema: spec-driven
 created: 2026-03-25
+status: implementing
+changes:
+  - id: PARTYKIT_WEBSOCKET_SYNC
+    description: Replace Supabase Realtime with PartyKit WebSocket for real-time game sync
+    files:
+      added:
+        - party/index.ts
+        - party/tsconfig.json
+        - partykit.json
+        - app/hooks/usePartyRoom.ts
+      modified:
+        - app/hooks/useRoom.ts
+        - app/page.tsx
+        - package.json
+        - .env.local
+        - next.config.ts
