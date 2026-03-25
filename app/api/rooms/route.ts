@@ -402,8 +402,6 @@ async function rollDice(roomId: string, userId: string, diceCount: number) {
     .update({
       dice_value: diceValue,
       dice_results: diceResults,
-      dice_roller_index: player.player_index,
-      dice_rolled_at: new Date().toISOString(),
       phase: "moving",
     })
     .eq("room_id", roomId);
@@ -417,7 +415,6 @@ async function rollDice(roomId: string, userId: string, diceCount: number) {
     diceValue,
     diceResults,
     phase: "moving",
-    diceRollerIndex: player.player_index,
   });
 
   return {
