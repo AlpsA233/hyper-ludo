@@ -140,6 +140,7 @@ export default function App() {
     leaveRoom,
     startGame: startMultiplayerGame,
     rollDice: roomRollDice,
+    releaseDiceLock,
     subscribe,
     loadRoom,
     endPlayerTurn,
@@ -538,14 +539,17 @@ export default function App() {
     if (gameState.phase === "moving" && !isMoving && !isRolling) {
       const results = gameState.dice_results;
       const value = gameState.dice_value;
+      const rollerIndex = gameState.dice_roller_index;
 
       // 非操作玩家：播放骰子动画
       if (
-        currentPlayerIndex !== gameState.turn &&
+        rollerIndex !== undefined &&
+        rollerIndex !== null &&
+        currentPlayerIndex !== rollerIndex &&
         results &&
         results.length > 0
       ) {
-        const animKey = `${gameState.turn}_${JSON.stringify(results)}`;
+        const animKey = `${rollerIndex}_${JSON.stringify(results)}_${gameState.dice_rolled_at}`;
         if (lastAnimatedDiceRef.current !== animKey) {
           lastAnimatedDiceRef.current = animKey;
           console.log(
@@ -553,13 +557,15 @@ export default function App() {
             results,
             "总计:",
             value,
+            "掷骰者:",
+            rollerIndex,
           );
           setIsRolling(true);
           animateDiceRoll(results).then(() => {
             setDiceValue(value);
             setDiceResults(results);
             addLog(
-              `Player ${gameState.turn + 1} rolled ${results.length === 1 ? value : results.join(", ") + ` (总计: ${value})`}`,
+              `Player ${rollerIndex + 1} rolled ${results.length === 1 ? value : results.join(", ") + ` (总计: ${value})`}`,
             );
             setIsRolling(false);
           });
@@ -1034,8 +1040,12 @@ export default function App() {
                 : `${apiDiceResults.join(", ")} (总计: ${apiDiceValue})`;
             addLog(`Player ${turn + 1} rolled ${resultString}`);
 
-            console.log("✅ 动画完成，调用handleMove移动玩家");
+            console.log("✅ 动画完成，释放掷骰锁并调用handleMove移动玩家");
             setIsRolling(false);
+            
+            // 释放掷骰状态锁
+            await releaseDiceLock();
+            
             handleMove(apiDiceValue);
           } else {
             console.error("❌ 无法播放动画:", {
@@ -1043,11 +1053,15 @@ export default function App() {
               apiDiceResults,
             });
             setIsRolling(false);
+            // 释放掷骰锁
+            await releaseDiceLock();
           }
         } catch (err) {
           console.error("❌ rollDice API异常:", err);
           addLog("❌ 掷骰子失败，请重试");
           setIsRolling(false);
+          // 释放掷骰锁
+          await releaseDiceLock();
         }
       } else {
         // 单人游戏：本地生成掷骰结果

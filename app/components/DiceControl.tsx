@@ -126,7 +126,7 @@ export default function DiceControl({
             {/* 多人游戏权限检查 */}
             {isMultiplayer && currentPlayerIndex !== turn && (
               <p className="text-sm text-yellow-400 font-bold bg-yellow-500/20 px-4 py-2 rounded-lg border border-yellow-500/30">
-                ⏳ 等待玩家 {turn + 1} 掷骰...
+                ⏳ 等待玩家 {turn + 1} ({players[turn]?.name || '未知'}) 掷骰...
               </p>
             )}
 

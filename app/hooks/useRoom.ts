@@ -88,6 +88,7 @@ interface UseRoomReturn {
   leaveRoom: () => Promise<void>;
   startGame: () => Promise<void>;
   rollDice: (diceCount: number) => Promise<any>;
+  releaseDiceLock: () => Promise<any>; // 释放掷骰状态锁
   movePlayer: (position: number, lapCount: number) => Promise<any>;
   triggerEvent: (event: any) => Promise<any>;
   endPlayerTurn: () => Promise<any>;
@@ -238,6 +239,25 @@ export function useRoom(userId: string | null): UseRoomReturn {
     } catch (err: any) {
       setError(err.message);
       throw err;
+    }
+  };
+
+  // 释放掷骰状态锁
+  const releaseDiceLock = async (): Promise<any> => {
+    if (!room || !userId) {
+      throw new Error("Not in a room");
+    }
+
+    try {
+      const result = await callRoomService("releaseDiceLock", {
+        roomId: room.id,
+      });
+
+      return result;
+    } catch (err: any) {
+      console.error("Failed to release dice lock:", err);
+      // 不抛出错误，因为这只是清理操作
+      return { success: false, error: err.message };
     }
   };
 
@@ -545,6 +565,7 @@ export function useRoom(userId: string | null): UseRoomReturn {
     leaveRoom,
     startGame,
     rollDice,
+    releaseDiceLock,
     movePlayer,
     triggerEvent,
     endPlayerTurn,
