@@ -149,7 +149,7 @@ export default function App() {
 
   const [roomId, setRoomId] = useState<string | null>(null);
 
-  // PartyKit WebSocket 多人游戏（实时对战）
+  // Ably WebSocket 多人游戏（实时对战）
   const partyRoom = usePartyRoom(roomId);
 
   // 多人游戏状态跟踪
@@ -157,8 +157,8 @@ export default function App() {
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState<number | null>(
     null,
   );
-  // WebSocket (PartyKit) 实时对战模式 - 当 WebSocket 连接成功时启用
-  const [usePartyKit, setUsePartyKit] = useState(false);
+  // Ably 实时对战模式 - 当 Ably 连接成功时启用
+  const [useAbly, setUseAbly] = useState(false);
 
   // 检测是否为PC端（屏幕宽度 >= 1024px）
   const [isPC, setIsPC] = useState(false);
@@ -380,8 +380,8 @@ export default function App() {
   }, [roomId, subscribe]);
 
   // ============================================================
-  // PartyKit WebSocket 加入房间
-  // 当进入房间大厅或开始游戏时，通过 WebSocket 加入 PartyKit 房间
+  // Ably WebSocket 加入房间
+  // 当进入房间大厅或开始游戏时，通过 WebSocket 加入 Ably 房间
   // ============================================================
   useEffect(() => {
     if (!roomId || !user?.id || !partyRoom.isConnected) return;
@@ -389,11 +389,11 @@ export default function App() {
     // 获取当前玩家的房间信息
     const myRoomPlayer = roomPlayers.find((p) => p.user_id === user.id);
     if (!myRoomPlayer) {
-      console.log("⚡ [PartyKit] 等待玩家信息加载...");
+      console.log("⚡ [Ably] 等待玩家信息加载...");
       return;
     }
 
-    console.log("⚡ [PartyKit] 发送 join 消息:", {
+    console.log("⚡ [Ably] 发送 join 消息:", {
       userId: user.id,
       playerName: myRoomPlayer.player_name,
       playerIndex: myRoomPlayer.player_index,
@@ -411,10 +411,10 @@ export default function App() {
   }, [roomId, user?.id, partyRoom.isConnected, roomPlayers]);
 
   // ============================================================
-  // PartyKit 游戏开始 - 房间创建者通知 PartyKit 服务器开始游戏
+  // Ably 游戏开始 - 房间创建者通知 Ably 服务器开始游戏
   // ============================================================
   useEffect(() => {
-    // 当游戏阶段变为 playing 且是房间创建者时，通知 PartyKit 开始游戏
+    // 当游戏阶段变为 playing 且是房间创建者时，通知 Ably 开始游戏
     if (
       phase === "playing" &&
       isCreator &&
@@ -422,7 +422,7 @@ export default function App() {
       partyRoom.isConnected &&
       partyRoom.phase === "waiting"
     ) {
-      console.log("⚡ [PartyKit] 房间创建者发送 start_game:", {
+      console.log("⚡ [Ably] 房间创建者发送 start_game:", {
         lapsToWin,
         eventDensity,
       });
@@ -692,15 +692,15 @@ export default function App() {
   }, [gameState, isMultiplayer, isMoving, isRolling]);
 
   // ============================================================
-  // PartyKit WebSocket 状态同步
-  // 当 WebSocket 连接且 roomState 更新时，同步到本地 React state
+  // Ably 实时状态同步
+  // 当 Ably 连接且 roomState 更新时，同步到本地 React state
   // ============================================================
   useEffect(() => {
-    // 仅在 PartyKit 模式下处理
-    if (!usePartyKit || !partyRoom.isConnected || !partyRoom.roomState) return;
+    // 仅在 Ably 模式下处理
+    if (!useAbly || !partyRoom.isConnected || !partyRoom.roomState) return;
 
     const rs = partyRoom.roomState;
-    console.log("⚡ [PartyKit Sync] 收到服务器状态:", {
+    console.log("⚡ [Ably Sync] 收到服务器状态:", {
       type: partyRoom.phase,
       currentTurn: rs.currentTurn,
       turn,
@@ -714,7 +714,7 @@ export default function App() {
 
     // 同步回合
     if (rs.currentTurn !== turn) {
-      console.log(`⚡ [PartyKit Sync] 回合更新: ${turn} → ${rs.currentTurn}`);
+      console.log(`⚡ [Ably Sync] 回合更新: ${turn} → ${rs.currentTurn}`);
       setTurn(rs.currentTurn);
       setHasUsedCard(false);
     }
@@ -723,7 +723,7 @@ export default function App() {
     if (rs.diceResults && rs.diceResults.length > 0) {
       if (JSON.stringify(rs.diceResults) !== JSON.stringify(diceResults)) {
         console.log(
-          "⚡ [PartyKit Sync] 骰子结果更新:",
+          "⚡ [Ably Sync] 骰子结果更新:",
           diceResults,
           "→",
           rs.diceResults,
@@ -734,7 +734,7 @@ export default function App() {
 
     if (rs.diceValue !== undefined && rs.diceValue !== diceValue) {
       console.log(
-        "⚡ [PartyKit Sync] 骰子总值更新:",
+        "⚡ [Ably Sync] 骰子总值更新:",
         diceValue,
         "→",
         rs.diceValue,
@@ -745,12 +745,12 @@ export default function App() {
     }
 
     // 同步棋盘瓷砖（游戏开始时）
-    // 注意：PartyKit 是权威状态源，boardTiles 应该始终以 PartyKit 的为准
+    // 注意：Ably 是权威状态源，boardTiles 应该始终以 Ably 的为准
     if (rs.boardTiles && rs.boardTiles.length > 0) {
       console.log(
-        "⚡ [PartyKit Sync] 棋盘瓷砖同步:",
+        "⚡ [Ably Sync] 棋盘瓷砖同步:",
         rs.boardTiles.length,
-        "块 (使用 PartyKit 权威版本)",
+        "块 (使用 Ably 权威版本)",
       );
       setBoardTiles(rs.boardTiles);
     }
@@ -791,7 +791,7 @@ export default function App() {
     if (rs.activeEvent && partyRoom.phase === "event") {
       // 非操作玩家：显示事件弹窗
       if (currentPlayerIndex !== turn) {
-        console.log("⚡ [PartyKit Sync] 收到事件:", rs.activeEvent);
+        console.log("⚡ [Ably Sync] 收到事件:", rs.activeEvent);
         setActiveEvent({
           id: rs.activeEvent.id,
           text: rs.activeEvent.text,
@@ -806,14 +806,14 @@ export default function App() {
 
     // 事件已清除
     if (!rs.activeEvent && partyRoom.phase === "playing" && activeEvent) {
-      console.log("⚡ [PartyKit Sync] 事件已清除");
+      console.log("⚡ [Ably Sync] 事件已清除");
       setActiveEvent(null);
       if (phase === "event") setPhase("playing");
     }
 
     // 胜利同步
     if (rs.winner !== null && rs.winner !== undefined) {
-      console.log("⚡ [PartyKit Sync] 胜利玩家:", rs.winner + 1);
+      console.log("⚡ [Ably Sync] 胜利玩家:", rs.winner + 1);
       setPlayers((prev) => {
         const winPlayer = prev[rs.winner!];
         if (winPlayer) {
@@ -832,7 +832,7 @@ export default function App() {
     ) {
       // 仅在没有进行中动画时清除
       if (!isMoving && !isRolling) {
-        console.log("⚡ [PartyKit Sync] 清空骰子结果");
+        console.log("⚡ [Ably Sync] 清空骰子结果");
         setDiceResults([]);
         setDiceValue(1);
       }
@@ -841,7 +841,7 @@ export default function App() {
     partyRoom.roomState,
     partyRoom.isConnected,
     partyRoom.phase,
-    usePartyKit,
+    useAbly,
     turn,
     diceResults,
     diceValue,
@@ -850,14 +850,14 @@ export default function App() {
     isRolling,
   ]);
 
-  // PartyKit 连接状态监控 - 当 WebSocket 连接成功时自动启用 PartyKit 模式
+  // Ably 连接状态监控 - 当 WebSocket 连接成功时自动启用 Ably 模式
   useEffect(() => {
     if (partyRoom.isConnected && roomId) {
-      console.log("⚡ PartyKit WebSocket 已连接，启用实时对战模式");
-      setUsePartyKit(true);
+      console.log("⚡ Ably WebSocket 已连接，启用实时对战模式");
+      setUseAbly(true);
     } else if (!partyRoom.isConnected) {
-      console.log("⚡ PartyKit WebSocket 已断开，回退到 Supabase 模式");
-      setUsePartyKit(false);
+      console.log("⚡ Ably WebSocket 已断开，回退到 Supabase 模式");
+      setUseAbly(false);
     }
   }, [partyRoom.isConnected, roomId]);
 
@@ -1151,10 +1151,10 @@ export default function App() {
     // 多人游戏：同步卡牌效果到服务器
     if (isMultiplayer && roomId) {
       // ============================================================
-      // PartyKit WebSocket 模式
+      // Ably WebSocket 模式
       // ============================================================
-      if (usePartyKit && partyRoom.isConnected && currentPlayerIndex !== null) {
-        console.log("⚡ PartyKit 模式：发送 useCard", { card: card.name });
+      if (useAbly && partyRoom.isConnected && currentPlayerIndex !== null) {
+        console.log("⚡ Ably 模式：发送 useCard", { card: card.name });
         partyRoom.useCard(currentPlayerIndex, card, targetId ?? undefined);
       } else {
         // ============================================================
@@ -1242,10 +1242,10 @@ export default function App() {
       // 多人游戏：调用服务器 API 生成掷骰结果
       if (isMultiplayer && roomId) {
         // ============================================================
-        // PartyKit WebSocket 实时对战模式
+        // Ably WebSocket 实时对战模式
         // ============================================================
-        if (usePartyKit && partyRoom.isConnected && currentPlayerIndex !== null) {
-          console.log("⚡ PartyKit 模式：发送 rollDice 请求", {
+        if (useAbly && partyRoom.isConnected && currentPlayerIndex !== null) {
+          console.log("⚡ Ably 模式：发送 rollDice 请求", {
             playerIndex: currentPlayerIndex,
             diceCount,
           });
@@ -1267,7 +1267,7 @@ export default function App() {
             const results = partyRoom.diceResults || [];
             const value = partyRoom.diceValue || 1;
 
-            console.log("⚡ PartyKit 收到服务器骰子结果:", { value, results, waitCount });
+            console.log("⚡ Ably 收到服务器骰子结果:", { value, results, waitCount });
 
             // 播放骰子动画
             if ((window as any).gsap && results.length > 0) {
@@ -1295,7 +1295,7 @@ export default function App() {
               handleMove(value);
             }
           } catch (err) {
-            console.error("❌ PartyKit rollDice 异常:", err);
+            console.error("❌ Ably rollDice 异常:", err);
             addLog("❌ 掷骰子失败，请重试");
             setIsRolling(false);
           }
@@ -1508,10 +1508,10 @@ export default function App() {
     const syncPositionToServer = async () => {
       if (isMultiplayer && roomId) {
         // ============================================================
-        // PartyKit WebSocket 模式
+        // Ably WebSocket 模式
         // ============================================================
-        if (usePartyKit && partyRoom.isConnected && currentPlayerIndex !== null) {
-          console.log("⚡ PartyKit 模式：发送 moveDone", {
+        if (useAbly && partyRoom.isConnected && currentPlayerIndex !== null) {
+          console.log("⚡ Ably 模式：发送 moveDone", {
             playerIndex: currentPlayerIndex,
             position: finalPos,
             lap: newLap,
@@ -1570,10 +1570,10 @@ export default function App() {
       // 同步位置到服务器（包含胜利状态）
       if (hasWon && isMultiplayer && roomId) {
         // ============================================================
-        // PartyKit 胜利模式
+        // Ably 胜利模式
         // ============================================================
-        if (usePartyKit && partyRoom.isConnected && currentPlayerIndex !== null) {
-          console.log("⚡ PartyKit 模式：发送胜利 moveDone + 胜利广播");
+        if (useAbly && partyRoom.isConnected && currentPlayerIndex !== null) {
+          console.log("⚡ Ably 模式：发送胜利 moveDone + 胜利广播");
           partyRoom.moveDone(currentPlayerIndex, finalPos, newLap);
           // 胜利状态由服务器通过 sync effect 同步
         } else {
@@ -1617,12 +1617,12 @@ export default function App() {
 
       // ============================================================
       // 事件触发和回合结束逻辑
-      // 注意：在 PartyKit 模式下，这些由服务器广播控制，客户端只需等待 sync
+      // 注意：在 Ably 模式下，这些由服务器广播控制，客户端只需等待 sync
       // ============================================================
-      if (usePartyKit && partyRoom.isConnected) {
-        // PartyKit 模式：服务器会广播 event_triggered 或 turn_ended
+      if (useAbly && partyRoom.isConnected) {
+        // Ably 模式：服务器会广播 event_triggered 或 turn_ended
         // 客户端的 sync effect 会处理状态更新，这里不需要做任何事
-        console.log("⚡ PartyKit 模式：等待服务器广播事件/回合状态");
+        console.log("⚡ Ably 模式：等待服务器广播事件/回合状态");
         return; // 直接返回，不执行下面的本地事件逻辑
       }
 
@@ -2526,10 +2526,10 @@ export default function App() {
               if (!isMultiplayer || !roomId) return;
 
               // ============================================================
-              // PartyKit WebSocket 模式
+              // Ably WebSocket 模式
               // ============================================================
-              if (usePartyKit && partyRoom.isConnected && currentPlayerIndex !== null) {
-                console.log("⚡ PartyKit 模式：发送 event_confirm");
+              if (useAbly && partyRoom.isConnected && currentPlayerIndex !== null) {
+                console.log("⚡ Ably 模式：发送 event_confirm");
                 // 通过 WebSocket 通知服务器确认事件
                 // 服务器会应用事件效果并广播 event_applied (包含 turn_ended)
                 partyRoom.confirmEvent(currentPlayerIndex);
