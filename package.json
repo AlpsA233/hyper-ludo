@@ -13,6 +13,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.98.0",
     "@vercel/kv": "^3.0.0",
+    "ably": "^2.21.0",
     "lucide-react": "^0.574.0",
     "next": "16.1.6",
     "partykit": "^0.0.115",
