@@ -69,7 +69,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Ably not configured" }, { status: 500 });
   }
 
-  if (!roomId || !userId) {
+  // sync_state can work without userId (it's a read-only state fetch)
+  if (!roomId || (!userId && action !== "sync_state")) {
     return NextResponse.json({ error: "Missing roomId or userId" }, { status: 400 });
   }
 
