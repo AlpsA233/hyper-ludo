@@ -9,6 +9,7 @@ import { useDeviceShake } from "@/app/hooks/useDeviceShake";
 import { useAuth } from "@/app/hooks/useAuth";
 import { useUserData } from "@/app/hooks/useUserData";
 import { useRoom } from "@/app/hooks/useRoom";
+import { usePartyRoom } from "@/app/hooks/usePartyRoom";
 import { supabase } from "@/app/lib/supabase";
 import {
   Dice1,
@@ -148,11 +149,16 @@ export default function App() {
 
   const [roomId, setRoomId] = useState<string | null>(null);
 
+  // PartyKit WebSocket 多人游戏（实时对战）
+  const partyRoom = usePartyRoom(roomId);
+
   // 多人游戏状态跟踪
   const [isMultiplayer, setIsMultiplayer] = useState(false);
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState<number | null>(
     null,
   );
+  // WebSocket (PartyKit) 实时对战模式 - 当 WebSocket 连接成功时启用
+  const [usePartyKit, setUsePartyKit] = useState(false);
 
   // 检测是否为PC端（屏幕宽度 >= 1024px）
   const [isPC, setIsPC] = useState(false);
@@ -372,6 +378,57 @@ export default function App() {
       setCurrentPlayerIndex(null);
     };
   }, [roomId, subscribe]);
+
+  // ============================================================
+  // PartyKit WebSocket 加入房间
+  // 当进入房间大厅或开始游戏时，通过 WebSocket 加入 PartyKit 房间
+  // ============================================================
+  useEffect(() => {
+    if (!roomId || !user?.id || !partyRoom.isConnected) return;
+
+    // 获取当前玩家的房间信息
+    const myRoomPlayer = roomPlayers.find((p) => p.user_id === user.id);
+    if (!myRoomPlayer) {
+      console.log("⚡ [PartyKit] 等待玩家信息加载...");
+      return;
+    }
+
+    console.log("⚡ [PartyKit] 发送 join 消息:", {
+      userId: user.id,
+      playerName: myRoomPlayer.player_name,
+      playerIndex: myRoomPlayer.player_index,
+      colorIndex: myRoomPlayer.color_index,
+      avatar: myRoomPlayer.avatar,
+    });
+
+    partyRoom.join(
+      user.id,
+      myRoomPlayer.player_name || user.user_metadata?.name || "Player",
+      myRoomPlayer.player_index,
+      myRoomPlayer.color_index,
+      myRoomPlayer.avatar || "👤",
+    );
+  }, [roomId, user?.id, partyRoom.isConnected, roomPlayers]);
+
+  // ============================================================
+  // PartyKit 游戏开始 - 房间创建者通知 PartyKit 服务器开始游戏
+  // ============================================================
+  useEffect(() => {
+    // 当游戏阶段变为 playing 且是房间创建者时，通知 PartyKit 开始游戏
+    if (
+      phase === "playing" &&
+      isCreator &&
+      roomId &&
+      partyRoom.isConnected &&
+      partyRoom.phase === "waiting"
+    ) {
+      console.log("⚡ [PartyKit] 房间创建者发送 start_game:", {
+        lapsToWin,
+        eventDensity,
+      });
+      partyRoom.startGame(lapsToWin, eventDensity);
+    }
+  }, [phase, isCreator, roomId, partyRoom.isConnected, partyRoom.phase, lapsToWin, eventDensity]);
 
   // 计算当前玩家索引 - 单独的 effect，在 roomPlayers 变化时运行
   useEffect(() => {
@@ -633,6 +690,176 @@ export default function App() {
       });
     }
   }, [gameState, isMultiplayer, isMoving, isRolling]);
+
+  // ============================================================
+  // PartyKit WebSocket 状态同步
+  // 当 WebSocket 连接且 roomState 更新时，同步到本地 React state
+  // ============================================================
+  useEffect(() => {
+    // 仅在 PartyKit 模式下处理
+    if (!usePartyKit || !partyRoom.isConnected || !partyRoom.roomState) return;
+
+    const rs = partyRoom.roomState;
+    console.log("⚡ [PartyKit Sync] 收到服务器状态:", {
+      type: partyRoom.phase,
+      currentTurn: rs.currentTurn,
+      turn,
+      diceValue: rs.diceValue,
+      diceResults: rs.diceResults,
+      players: rs.players?.length,
+      activeEvent: rs.activeEvent?.text,
+      winner: rs.winner,
+      timestamp: new Date().toLocaleTimeString(),
+    });
+
+    // 同步回合
+    if (rs.currentTurn !== turn) {
+      console.log(`⚡ [PartyKit Sync] 回合更新: ${turn} → ${rs.currentTurn}`);
+      setTurn(rs.currentTurn);
+      setHasUsedCard(false);
+    }
+
+    // 同步骰子结果
+    if (rs.diceResults && rs.diceResults.length > 0) {
+      if (JSON.stringify(rs.diceResults) !== JSON.stringify(diceResults)) {
+        console.log(
+          "⚡ [PartyKit Sync] 骰子结果更新:",
+          diceResults,
+          "→",
+          rs.diceResults,
+        );
+        setDiceResults(rs.diceResults);
+      }
+    }
+
+    if (rs.diceValue !== undefined && rs.diceValue !== diceValue) {
+      console.log(
+        "⚡ [PartyKit Sync] 骰子总值更新:",
+        diceValue,
+        "→",
+        rs.diceValue,
+      );
+      if (rs.diceValue !== undefined && rs.diceValue !== null) {
+        setDiceValue(rs.diceValue);
+      }
+    }
+
+    // 同步棋盘瓷砖（游戏开始时）
+    // 注意：PartyKit 是权威状态源，boardTiles 应该始终以 PartyKit 的为准
+    if (rs.boardTiles && rs.boardTiles.length > 0) {
+      console.log(
+        "⚡ [PartyKit Sync] 棋盘瓷砖同步:",
+        rs.boardTiles.length,
+        "块 (使用 PartyKit 权威版本)",
+      );
+      setBoardTiles(rs.boardTiles);
+    }
+
+    // 同步玩家位置
+    if (rs.players && rs.players.length > 0) {
+      setPlayers((prev) => {
+        if (prev.length === 0) return prev;
+        const next = [...prev];
+        let changed = false;
+        rs.players.forEach((rp) => {
+          const idx = rp.playerIndex;
+          if (idx < 0 || idx >= next.length) return;
+          // 跳过当前正在移动的玩家
+          if (isMoving && idx === turn) return;
+          const existingPlayer = next[idx];
+          if (!existingPlayer) return;
+          const needsUpdate =
+            rp.position !== existingPlayer.pos ||
+            rp.lap !== existingPlayer.lap ||
+            rp.skipTurn !== existingPlayer.skipTurn;
+          if (needsUpdate) {
+            next[idx] = {
+              ...existingPlayer,
+              pos: rp.position ?? existingPlayer.pos,
+              lap: rp.lap ?? existingPlayer.lap,
+              skipTurn: rp.skipTurn ?? existingPlayer.skipTurn,
+              cards: rp.cards && rp.cards.length > 0 ? rp.cards : existingPlayer.cards,
+            };
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    }
+
+    // 同步事件
+    if (rs.activeEvent && partyRoom.phase === "event") {
+      // 非操作玩家：显示事件弹窗
+      if (currentPlayerIndex !== turn) {
+        console.log("⚡ [PartyKit Sync] 收到事件:", rs.activeEvent);
+        setActiveEvent({
+          id: rs.activeEvent.id,
+          text: rs.activeEvent.text,
+          type: rs.activeEvent.type,
+          val: rs.activeEvent.val,
+          target: rs.activeEvent.target || "SELF",
+          color: rs.activeEvent.color || "#8b5cf6",
+        });
+        if (phase !== "event") setPhase("event");
+      }
+    }
+
+    // 事件已清除
+    if (!rs.activeEvent && partyRoom.phase === "playing" && activeEvent) {
+      console.log("⚡ [PartyKit Sync] 事件已清除");
+      setActiveEvent(null);
+      if (phase === "event") setPhase("playing");
+    }
+
+    // 胜利同步
+    if (rs.winner !== null && rs.winner !== undefined) {
+      console.log("⚡ [PartyKit Sync] 胜利玩家:", rs.winner + 1);
+      setPlayers((prev) => {
+        const winPlayer = prev[rs.winner!];
+        if (winPlayer) {
+          setWinner(winPlayer);
+          setPhase("win");
+        }
+        return prev;
+      });
+    }
+
+    // 清空骰子结果（回合结束时）
+    if (
+      (partyRoom.phase === "playing" || partyRoom.phase === "waiting") &&
+      (rs.diceResults === null || rs.diceResults.length === 0) &&
+      diceResults.length > 0
+    ) {
+      // 仅在没有进行中动画时清除
+      if (!isMoving && !isRolling) {
+        console.log("⚡ [PartyKit Sync] 清空骰子结果");
+        setDiceResults([]);
+        setDiceValue(1);
+      }
+    }
+  }, [
+    partyRoom.roomState,
+    partyRoom.isConnected,
+    partyRoom.phase,
+    usePartyKit,
+    turn,
+    diceResults,
+    diceValue,
+    currentPlayerIndex,
+    isMoving,
+    isRolling,
+  ]);
+
+  // PartyKit 连接状态监控 - 当 WebSocket 连接成功时自动启用 PartyKit 模式
+  useEffect(() => {
+    if (partyRoom.isConnected && roomId) {
+      console.log("⚡ PartyKit WebSocket 已连接，启用实时对战模式");
+      setUsePartyKit(true);
+    } else if (!partyRoom.isConnected) {
+      console.log("⚡ PartyKit WebSocket 已断开，回退到 Supabase 模式");
+      setUsePartyKit(false);
+    }
+  }, [partyRoom.isConnected, roomId]);
 
   // 多人游戏：同步房间玩家数据到游戏显示（用于左侧玩家部分）
   useEffect(() => {
@@ -923,21 +1150,32 @@ export default function App() {
 
     // 多人游戏：同步卡牌效果到服务器
     if (isMultiplayer && roomId) {
-      supabase.auth.getSession().then(({ data }) => {
-        const token = data.session?.access_token || "";
-        fetch("/api/rooms", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            action: "useCard",
-            roomId,
-            cardEffect: { card, playerUpdates },
-          }),
-        }).catch((err) => console.error("❌ useCard同步失败:", err));
-      });
+      // ============================================================
+      // PartyKit WebSocket 模式
+      // ============================================================
+      if (usePartyKit && partyRoom.isConnected && currentPlayerIndex !== null) {
+        console.log("⚡ PartyKit 模式：发送 useCard", { card: card.name });
+        partyRoom.useCard(currentPlayerIndex, card, targetId ?? undefined);
+      } else {
+        // ============================================================
+        // Supabase API 回退模式
+        // ============================================================
+        supabase.auth.getSession().then(({ data }) => {
+          const token = data.session?.access_token || "";
+          fetch("/api/rooms", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              action: "useCard",
+              roomId,
+              cardEffect: { card, playerUpdates },
+            }),
+          }).catch((err) => console.error("❌ useCard同步失败:", err));
+        });
+      }
     }
 
     // 如果是对自己使用移动卡牌，播放移动动画
@@ -1003,80 +1241,143 @@ export default function App() {
     try {
       // 多人游戏：调用服务器 API 生成掷骰结果
       if (isMultiplayer && roomId) {
-        console.log("🎲 多人模式：调用 rollDice API，diceCount:", diceCount);
-        try {
-          const response = await fetch("/api/rooms", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${(await supabase.auth.getSession())?.data.session?.access_token || ""}`,
-            },
-            body: JSON.stringify({
-              action: "rollDice",
-              roomId,
-              diceCount,
-            }),
+        // ============================================================
+        // PartyKit WebSocket 实时对战模式
+        // ============================================================
+        if (usePartyKit && partyRoom.isConnected && currentPlayerIndex !== null) {
+          console.log("⚡ PartyKit 模式：发送 rollDice 请求", {
+            playerIndex: currentPlayerIndex,
+            diceCount,
           });
 
-          if (!response.ok) {
-            const errorData = await response.json();
-            console.error(
-              "❌ rollDice API错误 (" + response.status + "):",
-              errorData.error,
-            );
+          try {
+            // 通过 WebSocket 发送掷骰请求
+            // 服务器会生成结果并广播给所有客户端
+            partyRoom.rollDice(currentPlayerIndex, diceCount);
+
+            // 等待服务器广播结果（通过 sync effect 更新本地状态）
+            // 最多等待 2 秒
+            let waitCount = 0;
+            const maxWait = 40; // 40 * 50ms = 2s
+            while ((!partyRoom.diceResults || partyRoom.diceResults.length === 0) && waitCount < maxWait) {
+              await new Promise(resolve => setTimeout(resolve, 50));
+              waitCount++;
+            }
+
+            const results = partyRoom.diceResults || [];
+            const value = partyRoom.diceValue || 1;
+
+            console.log("⚡ PartyKit 收到服务器骰子结果:", { value, results, waitCount });
+
+            // 播放骰子动画
+            if ((window as any).gsap && results.length > 0) {
+              console.log("▶️  开始播放骰子动画...");
+              await animateDiceRoll(results);
+              setDiceValue(value);
+              setDiceResults(results);
+
+              const resultString =
+                diceCount === 1
+                  ? `${value}`
+                  : `${results.join(", ")} (总计: ${value})`;
+              addLog(`Player ${turn + 1} rolled ${resultString}`);
+
+              console.log("✅ 动画完成，调用 handleMove 移动玩家");
+              setIsRolling(false);
+              handleMove(value);
+            } else {
+              console.error("❌ 无法播放动画或无结果:", {
+                hasGsap: !!(window as any).gsap,
+                results,
+              });
+              setIsRolling(false);
+              // 即使没有动画，也尝试移动
+              handleMove(value);
+            }
+          } catch (err) {
+            console.error("❌ PartyKit rollDice 异常:", err);
             addLog("❌ 掷骰子失败，请重试");
             setIsRolling(false);
-            return;
           }
-
-          const { diceValue: apiDiceValue, diceResults: apiDiceResults } =
-            await response.json();
-          console.log("📡 服务器掷骰结果:", {
-            diceValue: apiDiceValue,
-            diceResults: apiDiceResults,
-            length: apiDiceResults?.length,
-            hasGsap: !!(window as any).gsap,
-          });
-
-          // 使用服务器返回的结果显示动画
-          if (
-            (window as any).gsap &&
-            apiDiceResults &&
-            apiDiceResults.length > 0
-          ) {
-            console.log("▶️  开始播放骰子动画...");
-            await animateDiceRoll(apiDiceResults);
-            setDiceValue(apiDiceValue);
-            setDiceResults(apiDiceResults);
-
-            const resultString =
-              diceCount === 1
-                ? `${apiDiceValue}`
-                : `${apiDiceResults.join(", ")} (总计: ${apiDiceValue})`;
-            addLog(`Player ${turn + 1} rolled ${resultString}`);
-
-            console.log("✅ 动画完成，释放掷骰锁并调用handleMove移动玩家");
-            setIsRolling(false);
-            
-            // 释放掷骰状态锁
-            await releaseDiceLock();
-            
-            handleMove(apiDiceValue);
-          } else {
-            console.error("❌ 无法播放动画:", {
-              hasGsap: !!(window as any).gsap,
-              apiDiceResults,
+        } else {
+          // ============================================================
+          // Supabase API 回退模式
+          // ============================================================
+          console.log("🎲 多人模式（Supabase API）：调用 rollDice API，diceCount:", diceCount);
+          try {
+            const response = await fetch("/api/rooms", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${(await supabase.auth.getSession())?.data.session?.access_token || ""}`,
+              },
+              body: JSON.stringify({
+                action: "rollDice",
+                roomId,
+                diceCount,
+              }),
             });
+
+            if (!response.ok) {
+              const errorData = await response.json();
+              console.error(
+                "❌ rollDice API错误 (" + response.status + "):",
+                errorData.error,
+              );
+              addLog("❌ 掷骰子失败，请重试");
+              setIsRolling(false);
+              return;
+            }
+
+            const { diceValue: apiDiceValue, diceResults: apiDiceResults } =
+              await response.json();
+            console.log("📡 服务器掷骰结果:", {
+              diceValue: apiDiceValue,
+              diceResults: apiDiceResults,
+              length: apiDiceResults?.length,
+              hasGsap: !!(window as any).gsap,
+            });
+
+            // 使用服务器返回的结果显示动画
+            if (
+              (window as any).gsap &&
+              apiDiceResults &&
+              apiDiceResults.length > 0
+            ) {
+              console.log("▶️  开始播放骰子动画...");
+              await animateDiceRoll(apiDiceResults);
+              setDiceValue(apiDiceValue);
+              setDiceResults(apiDiceResults);
+
+              const resultString =
+                diceCount === 1
+                  ? `${apiDiceValue}`
+                  : `${apiDiceResults.join(", ")} (总计: ${apiDiceValue})`;
+              addLog(`Player ${turn + 1} rolled ${resultString}`);
+
+              console.log("✅ 动画完成，释放掷骰锁并调用handleMove移动玩家");
+              setIsRolling(false);
+
+              // 释放掷骰状态锁
+              await releaseDiceLock();
+
+              handleMove(apiDiceValue);
+            } else {
+              console.error("❌ 无法播放动画:", {
+                hasGsap: !!(window as any).gsap,
+                apiDiceResults,
+              });
+              setIsRolling(false);
+              // 释放掷骰锁
+              await releaseDiceLock();
+            }
+          } catch (err) {
+            console.error("❌ rollDice API异常:", err);
+            addLog("❌ 掷骰子失败，请重试");
             setIsRolling(false);
             // 释放掷骰锁
             await releaseDiceLock();
           }
-        } catch (err) {
-          console.error("❌ rollDice API异常:", err);
-          addLog("❌ 掷骰子失败，请重试");
-          setIsRolling(false);
-          // 释放掷骰锁
-          await releaseDiceLock();
         }
       } else {
         // 单人游戏：本地生成掷骰结果
@@ -1206,25 +1507,42 @@ export default function App() {
     // 多人游戏：先同步位置到服务器，其他玩家通过 roomPlayers Realtime 收到更新
     const syncPositionToServer = async () => {
       if (isMultiplayer && roomId) {
-        try {
-          const token =
-            (await supabase.auth.getSession())?.data.session?.access_token ||
-            "";
-          await fetch("/api/rooms", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              action: "movePlayer",
-              roomId,
-              position: finalPos,
-              lapCount: newLap,
-            }),
+        // ============================================================
+        // PartyKit WebSocket 模式
+        // ============================================================
+        if (usePartyKit && partyRoom.isConnected && currentPlayerIndex !== null) {
+          console.log("⚡ PartyKit 模式：发送 moveDone", {
+            playerIndex: currentPlayerIndex,
+            position: finalPos,
+            lap: newLap,
           });
-        } catch (err) {
-          console.error("❌ movePlayer同步失败:", err);
+          // 通过 WebSocket 通知服务器移动完成
+          // 服务器会广播 position 更新，并判断是否触发事件或结束回合
+          partyRoom.moveDone(currentPlayerIndex, finalPos, newLap);
+        } else {
+          // ============================================================
+          // Supabase API 回退模式
+          // ============================================================
+          try {
+            const token =
+              (await supabase.auth.getSession())?.data.session?.access_token ||
+              "";
+            await fetch("/api/rooms", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                action: "movePlayer",
+                roomId,
+                position: finalPos,
+                lapCount: newLap,
+              }),
+            });
+          } catch (err) {
+            console.error("❌ movePlayer同步失败:", err);
+          }
         }
       }
     };
@@ -1251,39 +1569,64 @@ export default function App() {
       addLog(`Player ${turn + 1} moved to pos ${finalPos} (lap ${newLap})`);
       // 同步位置到服务器（包含胜利状态）
       if (hasWon && isMultiplayer && roomId) {
-        supabase.auth.getSession().then(async ({ data }) => {
-          const token = data.session?.access_token || "";
-          // 更新位置
-          await fetch("/api/rooms", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              action: "movePlayer",
-              roomId,
-              position: finalPos,
-              lapCount: newLap,
-            }),
-          }).catch(console.error);
-          // 广播胜利
-          await fetch("/api/rooms", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              action: "setWinner",
-              roomId,
-              winnerIndex: turn,
-            }),
-          }).catch(console.error);
-        });
+        // ============================================================
+        // PartyKit 胜利模式
+        // ============================================================
+        if (usePartyKit && partyRoom.isConnected && currentPlayerIndex !== null) {
+          console.log("⚡ PartyKit 模式：发送胜利 moveDone + 胜利广播");
+          partyRoom.moveDone(currentPlayerIndex, finalPos, newLap);
+          // 胜利状态由服务器通过 sync effect 同步
+        } else {
+          // ============================================================
+          // Supabase API 胜利模式
+          // ============================================================
+          supabase.auth.getSession().then(async ({ data }) => {
+            const token = data.session?.access_token || "";
+            // 更新位置
+            await fetch("/api/rooms", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                action: "movePlayer",
+                roomId,
+                position: finalPos,
+                lapCount: newLap,
+              }),
+            }).catch(console.error);
+            // 广播胜利
+            await fetch("/api/rooms", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                action: "setWinner",
+                roomId,
+                winnerIndex: turn,
+              }),
+            }).catch(console.error);
+          });
+        }
       } else {
         syncPositionToServer();
       }
+
+      // ============================================================
+      // 事件触发和回合结束逻辑
+      // 注意：在 PartyKit 模式下，这些由服务器广播控制，客户端只需等待 sync
+      // ============================================================
+      if (usePartyKit && partyRoom.isConnected) {
+        // PartyKit 模式：服务器会广播 event_triggered 或 turn_ended
+        // 客户端的 sync effect 会处理状态更新，这里不需要做任何事
+        console.log("⚡ PartyKit 模式：等待服务器广播事件/回合状态");
+        return; // 直接返回，不执行下面的本地事件逻辑
+      }
+
+      // Supabase/本地模式：客户端本地处理事件触发
       // 事件触发: 只在CUSTOM格子上触发
       const isCustomTile =
         finalPos !== -1 && boardTiles[finalPos]?.id === "CUSTOM";
@@ -2181,6 +2524,21 @@ export default function App() {
               }>,
             ) => {
               if (!isMultiplayer || !roomId) return;
+
+              // ============================================================
+              // PartyKit WebSocket 模式
+              // ============================================================
+              if (usePartyKit && partyRoom.isConnected && currentPlayerIndex !== null) {
+                console.log("⚡ PartyKit 模式：发送 event_confirm");
+                // 通过 WebSocket 通知服务器确认事件
+                // 服务器会应用事件效果并广播 event_applied (包含 turn_ended)
+                partyRoom.confirmEvent(currentPlayerIndex);
+                return;
+              }
+
+              // ============================================================
+              // Supabase API 回退模式
+              // ============================================================
               const token =
                 (await supabase.auth.getSession())?.data.session
                   ?.access_token || "";
