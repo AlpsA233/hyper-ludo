@@ -242,10 +242,11 @@ export function useRoom(userId: string | null): UseRoomReturn {
     }
   };
 
-  // 释放掷骰状态锁
+  // 释放掷骰状态锁（不抛错，因为是清理操作）
   const releaseDiceLock = async (): Promise<any> => {
     if (!room || !userId) {
-      throw new Error("Not in a room");
+      console.warn("⚠️ releaseDiceLock: 不在房间中，跳过");
+      return { success: true };
     }
 
     try {
