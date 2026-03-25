@@ -354,7 +354,7 @@ async function rollDice(roomId: string, userId: string, diceCount: number) {
   // 获取游戏状态
   const { data: gameState, error: gameStateError } = await supabaseAdmin
     .from("room_games")
-    .select("turn, phase, is_rolling")
+    .select("turn, phase")
     .eq("room_id", roomId)
     .maybeSingle();
 
@@ -387,25 +387,6 @@ async function rollDice(roomId: string, userId: string, diceCount: number) {
     throw new Error("Cannot roll dice in current game phase.");
   }
 
-  // 🔧 验证是否有其他玩家正在掷骰子
-  if (gameState.is_rolling) {
-    console.warn("❌ 掷骰状态锁冲突:", {
-      isRolling: gameState.is_rolling,
-    });
-    throw new Error("Another player is currently rolling. Please wait.");
-  }
-
-  // 🔧 设置掷骰状态锁
-  const { error: lockError } = await supabaseAdmin
-    .from("room_games")
-    .update({ is_rolling: true })
-    .eq("room_id", roomId);
-
-  if (lockError) {
-    console.error("❌ 设置掷骰锁失败:", lockError);
-    throw new Error(`Failed to acquire dice lock: ${lockError.message}`);
-  }
-
   // 生成掷骰结果
   const diceResults = Array.from(
     { length: diceCount },
@@ -416,26 +397,19 @@ async function rollDice(roomId: string, userId: string, diceCount: number) {
   console.log("🎲 生成掷骰结果:", { diceValue, diceResults, diceCount });
 
   // 更新游戏状态
-  // 🔧 修复：添加 is_rolling = true 条件，避免覆盖其他玩家的掷骰状态
   const { error: updateError } = await supabaseAdmin
     .from("room_games")
     .update({
       dice_value: diceValue,
       dice_results: diceResults,
-      dice_roller_index: player.player_index, // 🔧 记录谁掷的骰子
-      dice_rolled_at: new Date().toISOString(), // 🔧 记录掷骰时间
+      dice_roller_index: player.player_index,
+      dice_rolled_at: new Date().toISOString(),
       phase: "moving",
     })
-    .eq("room_id", roomId)
-    .eq("is_rolling", true); // ✅ 只更新正在掷骰的状态，避免竞争
+    .eq("room_id", roomId);
 
   if (updateError) {
     console.error("❌ 更新游戏状态失败:", updateError);
-    // 🔧 出错时释放锁
-    await supabaseAdmin
-      .from("room_games")
-      .update({ is_rolling: false })
-      .eq("room_id", roomId);
     throw new Error(`Failed to update game state: ${updateError.message}`);
   }
 
@@ -454,33 +428,9 @@ async function rollDice(roomId: string, userId: string, diceCount: number) {
   };
 }
 
-// 🔧 新增：释放掷骰状态锁
+// 释放掷骰状态锁（保留函数签名兼容，但不再需要锁机制）
 async function releaseDiceLock(roomId: string, userId: string) {
   console.log("🔓 API: releaseDiceLock 被调用", { roomId, userId });
-
-  // 验证玩家在房间中
-  const { data: player } = await supabaseAdmin
-    .from("room_players")
-    .select("player_index")
-    .eq("room_id", roomId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (!player) {
-    throw new Error("Not in this room");
-  }
-
-  // 释放掷骰状态锁
-  const { error } = await supabaseAdmin
-    .from("room_games")
-    .update({ is_rolling: false })
-    .eq("room_id", roomId);
-
-  if (error) {
-    throw new Error(`Failed to release dice lock: ${error.message}`);
-  }
-
-  console.log("✅ 掷骰锁已释放");
   return { success: true };
 }
 
