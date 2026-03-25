@@ -8,6 +8,14 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 const ABLY_API_KEY = process.env.ABLY_API_KEY!;
 
+// Debug: log environment (without exposing secrets)
+console.log("[/api/ably] Environment check:", {
+  hasSupabaseUrl: !!supabaseUrl,
+  hasServiceKey: !!supabaseServiceKey,
+  hasAblyKey: !!ABLY_API_KEY,
+  serviceKeyPrefix: supabaseServiceKey?.substring(0, 20) + "...",
+});
+
 // Helper: publish state to Ably channel
 async function publishState(
   roomId: string,
@@ -158,7 +166,7 @@ export async function POST(request: Request) {
           .maybeSingle();
 
         if (!existingGame) {
-          await supabaseAdmin.from("room_games").insert({
+          const { data: insertData, error: insertError } = await supabaseAdmin.from("room_games").insert({
             room_id: roomId,
             turn: 0,
             phase: "playing",
@@ -170,6 +178,13 @@ export async function POST(request: Request) {
             active_card: null,
             laps_to_win: lapsToWin,
           });
+          
+          if (insertError) {
+            console.error("[/api/ably] start_game insert error:", insertError);
+            return NextResponse.json({ error: "Failed to create game: " + insertError.message }, { status: 500 });
+          }
+          console.log("[/api/ably] start_game inserted:", insertData);
+        }
         } else {
           await supabaseAdmin.from("room_games").update({
             turn: 0,
