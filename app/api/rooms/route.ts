@@ -243,13 +243,15 @@ async function startGame(roomId: string, userId: string) {
   }
 
   // 🔧 在服务器端生成boardTiles，确保所有玩家看到相同的棋盘
-  const totalSteps = 40; // Ludo 标准棋盘格子数
-  const numPlayers = room.num_players || 2;
+  // 🔧 修复：动态计算 totalSteps，而不是硬编码 40
+  const numPlayers = room.num_players || 4;
+  const totalSteps = numPlayers * 10; // 每玩家 10 格，Ludo 标准
   const eventDensity = room.event_density || 40;
 
   const boardTiles = Array.from({ length: totalSteps }).map((_, i) => {
-    // 起始点附近保持安全
-    if (i % (totalSteps / numPlayers) < 2) {
+    // 起始点附近保持安全（每圈的前2格）
+    const tilesPerPlayer = totalSteps / numPlayers;
+    if (i % tilesPerPlayer < 2) {
       return { id: "SAFE" };
     }
     // 根据事件密度生成CUSTOM格子
@@ -329,6 +331,7 @@ async function startGame(roomId: string, userId: string) {
     room: updatedRoom,
     players: players || [],
     boardTiles,
+    numPlayers, // 🔧 显式返回 numPlayers，确保客户端使用正确的值
   };
 }
 
@@ -413,6 +416,7 @@ async function rollDice(roomId: string, userId: string, diceCount: number) {
   console.log("🎲 生成掷骰结果:", { diceValue, diceResults, diceCount });
 
   // 更新游戏状态
+  // 🔧 修复：添加 is_rolling = true 条件，避免覆盖其他玩家的掷骰状态
   const { error: updateError } = await supabaseAdmin
     .from("room_games")
     .update({
@@ -422,7 +426,8 @@ async function rollDice(roomId: string, userId: string, diceCount: number) {
       dice_rolled_at: new Date().toISOString(), // 🔧 记录掷骰时间
       phase: "moving",
     })
-    .eq("room_id", roomId);
+    .eq("room_id", roomId)
+    .eq("is_rolling", true); // ✅ 只更新正在掷骰的状态，避免竞争
 
   if (updateError) {
     console.error("❌ 更新游戏状态失败:", updateError);

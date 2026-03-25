@@ -196,6 +196,18 @@ export default function App() {
   // 用于防止多人游戏中重复播放同一次掷骰动画
   const lastAnimatedDiceRef = useRef<string | null>(null);
 
+  // 🔧 修复轮询闭包问题：使用 ref 跟踪最新值，避免 stale closure
+  const turnRef = useRef(turn);
+  const isRollingRef = useRef(isRolling);
+  const isMovingRef = useRef(isMoving);
+  const numPlayersRef = useRef(numPlayers);
+
+  // 当这些值变化时，同步更新 ref
+  useEffect(() => { turnRef.current = turn; }, [turn]);
+  useEffect(() => { isRollingRef.current = isRolling; }, [isRolling]);
+  useEffect(() => { isMovingRef.current = isMoving; }, [isMoving]);
+  useEffect(() => { numPlayersRef.current = numPlayers; }, [numPlayers]);
+
   // 摇一摇掷骰子（只在游戏中且没有弹窗时启用）
   const {
     isSupported: isShakeSupported,
@@ -662,12 +674,14 @@ export default function App() {
 
   // 多人游戏：定期轮询 room_games 确保 turn 同步（作为 Realtime 的可靠备份）
   // 解决 Realtime 未能送达时 Player 2 看不到回合更新的问题
+  // 🔧 修复：使用 ref 避免 stale closure 问题，减少依赖项
   useEffect(() => {
     if (!isMultiplayer || !roomId || phase !== "playing") return;
 
     const pollGameState = async () => {
       // 正在掷骰或移动中，跳过以避免干扰动画
-      if (isRolling || isMoving) return;
+      // 🔧 使用 ref 获取最新值，避免闭包中的旧值
+      if (isRollingRef.current || isMovingRef.current) return;
 
       try {
         const token =
@@ -686,10 +700,11 @@ export default function App() {
         const { gameState: remoteState } = await response.json();
         if (!remoteState) return;
 
+        // 🔧 使用 ref 获取最新 turn 值
         // 如果服务器 turn 与本地不一致，强制同步
-        if (remoteState.turn !== undefined && remoteState.turn !== turn) {
+        if (remoteState.turn !== undefined && remoteState.turn !== turnRef.current) {
           console.log(
-            `🔄 [Poll] 游戏回合同步: ${turn} → ${remoteState.turn}`,
+            `🔄 [Poll] 游戏回合同步: ${turnRef.current} → ${remoteState.turn}`,
           );
           setTurn(remoteState.turn);
           setHasUsedCard(false);
@@ -701,7 +716,7 @@ export default function App() {
 
     const interval = setInterval(pollGameState, 2000);
     return () => clearInterval(interval);
-  }, [isMultiplayer, roomId, phase, isRolling, isMoving, turn]);
+  }, [isMultiplayer, roomId, phase]); // 🔧 减少依赖项，避免频繁重建
 
   const totalSteps = useMemo(() => numPlayers * 10, [numPlayers]);
   const center = { x: 400, y: 400 };
