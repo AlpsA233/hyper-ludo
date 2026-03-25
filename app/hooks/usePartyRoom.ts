@@ -136,6 +136,7 @@ export function usePartyRoom(roomId: string | null): UsePartyRoomReturn {
 
       case "dice_rolled": {
         const p = data.payload as any;
+        console.log("[Ably] dice_rolled payload:", JSON.stringify(p));
         setRoomState(prev => prev ? {
           ...prev,
           diceValue: p.diceValue,
