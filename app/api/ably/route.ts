@@ -184,7 +184,6 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Failed to create game: " + insertError.message }, { status: 500 });
           }
           console.log("[/api/ably] start_game inserted:", insertData);
-        }
         } else {
           await supabaseAdmin.from("room_games").update({
             turn: 0,
