@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { kv } from "@vercel/kv";
+import { supabase } from "@/app/lib/supabase";
 import { createHash } from "crypto";
 
 // 根据配置内容生成固定ID（相同配置生成相同ID）
@@ -28,18 +28,40 @@ export async function POST(request: NextRequest) {
     // 根据内容生成ID
     const configId = generateConfigId(configContent);
 
-    // 创建完整配置（包含ID和时间戳）
-    const config = {
-      id: configId,
-      cards,
-      events,
-      createdAt: new Date().toISOString(),
-    };
+    // 检查是否已存在配置
+    const { data: existingConfig } = await supabase
+      .from("configs")
+      .select("*")
+      .eq("id", configId)
+      .single();
 
-    // 存储到 Vercel KV，30天后过期（相同配置会刷新过期时间）
-    await kv.set(`config:${configId}`, config, {
-      ex: 60 * 60 * 24 * 30, // 30天
-    });
+    if (existingConfig) {
+      // 已存在，更新 created_at 以刷新过期时间
+      const { error: updateError } = await supabase
+        .from("configs")
+        .update({ created_at: new Date().toISOString() })
+        .eq("id", configId);
+
+      if (updateError) {
+        throw updateError;
+      }
+    } else {
+      // 不存在，插入新配置
+      const config = {
+        id: configId,
+        cards,
+        events,
+        created_at: new Date().toISOString(),
+      };
+
+      const { error: insertError } = await supabase
+        .from("configs")
+        .insert(config);
+
+      if (insertError) {
+        throw insertError;
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -65,10 +87,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "缺少配置ID" }, { status: 400 });
     }
 
-    // 从 Vercel KV 读取配置
-    const config = await kv.get(`config:${configId}`);
+    // 从 Supabase 读取配置
+    const { data: config, error } = await supabase
+      .from("configs")
+      .select("*")
+      .eq("id", configId)
+      .single();
 
-    if (!config) {
+    if (error || !config) {
       return NextResponse.json(
         { error: "配置不存在或已过期" },
         { status: 404 },
