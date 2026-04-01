@@ -4,12 +4,14 @@ import type { GameEvent } from "@/app/types";
 interface EventModalProps {
   activeEvent: GameEvent | null;
   applyEventEffect: () => void;
+  isCurrentPlayerTurn?: boolean;
   t: any;
 }
 
 export default function EventModal({
   activeEvent,
   applyEventEffect,
+  isCurrentPlayerTurn = true,
   t,
 }: EventModalProps) {
   if (!activeEvent) return null;
@@ -50,7 +52,7 @@ export default function EventModal({
           <button
             onClick={applyEventEffect}
             className="w-full py-2.5 sm:py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-base sm:text-lg rounded-xl shadow-lg hover:shadow-2xl hover:shadow-cyan-500/50 transition-all duration-300 hover:scale-105 active:scale-95">
-            {t.taskComplete || "继续"}
+            {isCurrentPlayerTurn ? (t.taskComplete || "继续") : (t.gotIt || "知道了")}
           </button>
         </div>
       </div>

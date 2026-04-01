@@ -370,14 +370,12 @@ export default function App() {
       return;
     }
 
-    console.log("🔌 订阅房间 Realtime:", roomId);
     setIsMultiplayer(true);
 
     // 建立 Realtime 订阅
     const unsubscribe = subscribe(roomId);
 
     return () => {
-      console.log("❌ 取消 Realtime 订阅:", roomId);
       unsubscribe();
       // 🔧 取消订阅时重置多人游戏状态
       setIsMultiplayer(false);
@@ -392,9 +390,6 @@ export default function App() {
 
     const myIndex = roomPlayers.findIndex((p) => p.user_id === effectiveUserId);
     setCurrentPlayerIndex(myIndex >= 0 ? myIndex : null);
-    if (myIndex >= 0) {
-      console.log("👤 当前玩家索引:", myIndex);
-    }
   }, [roomPlayers, effectiveUserId, room, roomId]);
 
   // 检测房间状态变化：如果房间状态变为 "playing" 且客户端还在 lobby，自动启动游戏
@@ -404,11 +399,6 @@ export default function App() {
     if (room.state !== "playing") return;
     // 等待 players_update 和 game_update 也到达（WS 顺序广播，通常几毫秒内）
     if (!roomPlayers.length || !gameState) return;
-
-    console.log("🎮 检测到房间已开始，从 WS 数据初始化游戏状态", {
-      boardTiles: gameState.board_tiles?.length,
-      players: roomPlayers.length,
-    });
 
     // 初始化游戏配置（来自 WS room 对象）
     setNumPlayers(room.num_players);
@@ -462,27 +452,8 @@ export default function App() {
   useEffect(() => {
     if (!gameState || !isMultiplayer) return;
 
-    // 📊 调试日志：显示完整的接收到的 gameState
-    console.log("🎮 [GameState Update] 接收到完整的 gameState:", {
-      ...gameState,
-      timestamp: new Date().toLocaleTimeString(),
-    });
-
-    console.log("🎮 [GameState Update] 当前本地状态对比:", {
-      remote_turn: gameState.turn,
-      local_turn: turn,
-      remote_dice_value: gameState.dice_value,
-      local_dice_value: diceValue,
-      remote_dice_results: gameState.dice_results,
-      local_dice_results: diceResults,
-      remote_phase: gameState.phase,
-      isMoving,
-      isRolling,
-    });
-
     // 更新 turn
     if (gameState.turn !== undefined && gameState.turn !== turn) {
-      console.log(`🔄 [Turn Update] 回合更新: ${turn} → ${gameState.turn}`);
       setTurn(gameState.turn);
     }
 
@@ -491,12 +462,6 @@ export default function App() {
       if (
         JSON.stringify(gameState.dice_results) !== JSON.stringify(diceResults)
       ) {
-        console.log(
-          "🎲 [Dice Results Update] 骰子结果更新:",
-          diceResults,
-          "→",
-          gameState.dice_results,
-        );
         setDiceResults(gameState.dice_results);
       }
     }
@@ -505,23 +470,11 @@ export default function App() {
       gameState.dice_value !== undefined &&
       gameState.dice_value !== diceValue
     ) {
-      console.log(
-        "🎲 [Dice Value Update] 骰子总值更新:",
-        diceValue,
-        "→",
-        gameState.dice_value,
-      );
       setDiceValue(gameState.dice_value);
     }
 
     // 如果掷骰完成，更新 phase 为 "moving"
     if (gameState.phase === "moving" && !isMoving && !isRolling) {
-      // 其他玩家看到掷骰结果，不再显示动画
-      console.log(
-        "📍 [Phase Moving] 其他玩家看到掷骰结果:",
-        gameState.dice_value,
-        gameState.dice_results,
-      );
       addLog(
         `Player ${gameState.turn + 1} rolled ${gameState.dice_results?.length === 1 ? gameState.dice_value : gameState.dice_results?.join(", ") + ` (总计: ${gameState.dice_value})`}`,
       );
@@ -531,10 +484,6 @@ export default function App() {
     if (gameState.phase === "event" && gameState.active_event) {
       // 非操作玩家：显示事件弹窗（操作玩家已在本地触发）
       if (currentPlayerIndex !== gameState.turn) {
-        console.log(
-          "📍 [Event Sync] 非操作玩家收到事件:",
-          gameState.active_event,
-        );
         setActiveEvent({
           id: gameState.active_event.id,
           text: gameState.active_event.text,
@@ -553,7 +502,6 @@ export default function App() {
       !gameState.active_event &&
       activeEvent
     ) {
-      console.log("📍 [Event Cleared] 服务器清除事件，关闭本地弹窗");
       setActiveEvent(null);
       if (phase === "event") setPhase("playing");
     }
@@ -564,7 +512,6 @@ export default function App() {
       gameState.active_card?.winnerIndex !== undefined
     ) {
       const wIdx = gameState.active_card.winnerIndex;
-      console.log("🏆 [Win Sync] 胜利玩家:", wIdx + 1);
       setPlayers((prev) => {
         const winner = prev[wIdx];
         if (winner) {
@@ -582,12 +529,6 @@ export default function App() {
 
     // 仅在游戏进行中时同步玩家信息
     if (phase === "playing" || phase === "event") {
-      console.log(
-        "👥 同步房间玩家数据到游戏显示:",
-        roomPlayers.length,
-        "位玩家",
-      );
-
       // 把 roomPlayers（来自 Realtime）同步到本地 players 状态（位置、圈数、skipTurn）
       // 仅同步非当前操作玩家（操作方自己已由本地状态管理动画）
       setPlayers((prev) => {
@@ -837,26 +778,12 @@ export default function App() {
 
     // 多人游戏权限检查
     if (isMultiplayer) {
-      console.log("🎲 权限检查:", {
-        isMultiplayer,
-        currentPlayerIndex,
-        turn,
-        isMyTurn: currentPlayerIndex === turn,
-      });
-
       if (currentPlayerIndex === null) {
-        console.warn("❌ 当前玩家索引未初始化");
         addLog("❌ 游戏状态异常，请重新开始游戏");
         return;
       }
 
       if (currentPlayerIndex !== turn) {
-        console.warn(
-          "❌ 不是你的回合。当前玩家:",
-          turn,
-          "你的索引:",
-          currentPlayerIndex,
-        );
         addLog(`⏳ 等待玩家 ${turn + 1} 掷骰子...`);
         return;
       }
@@ -864,7 +791,6 @@ export default function App() {
       // 🔧 检查玩家是否被跳过（因为卡牌或事件效果）
       const currentPlayer = players[turn];
       if (currentPlayer && currentPlayer.skipTurn) {
-        console.log(`⏭️  玩家 ${turn + 1} 被跳过，进入下一个回合`);
         addLog(`⏭️  玩家 ${turn + 1} 被跳过`);
         setPlayers((prev) =>
           prev.map((p, i) => (i === turn ? { ...p, skipTurn: false } : p)),
@@ -887,14 +813,9 @@ export default function App() {
     try {
       // 多人游戏：通过 WebSocket 生成掷骰结果
       if (isMultiplayer && roomId) {
-        console.log("🎲 多人模式：调用 WS rollDice，diceCount:", diceCount);
         try {
           const { diceValue: apiDiceValue, diceResults: apiDiceResults } =
             await roomRollDice(diceCount);
-          console.log("📡 服务器掷骰结果:", {
-            diceValue: apiDiceValue,
-            diceResults: apiDiceResults,
-          });
 
           if (
             (window as any).gsap &&
@@ -927,7 +848,6 @@ export default function App() {
         }
       } else {
         // 单人游戏：本地生成掷骰结果
-        console.log("🎲 单人模式：本地生成掷骰结果");
         const results: number[] = Array.from({ length: diceCount }).map(
           () => Math.floor(Math.random() * 6) + 1,
         );
@@ -1036,14 +956,6 @@ export default function App() {
    * @param isEventMove - 是否是事件触发的移动（当前未使用此参数）
    */
   const handleMove = (steps: number, isEventMove: boolean = false) => {
-    console.log("🚀 handleMove 被调用:", {
-      steps,
-      isEventMove,
-      turn,
-      currentPlayer: players[turn]?.name,
-      isMultiplayer,
-    });
-
     setIsMoving(true);
     const p = players[turn];
 
@@ -1124,7 +1036,6 @@ export default function App() {
           if (allowedEvents.length === 0) {
             setIsMoving(false);
             if (isMultiplayer && roomId) {
-              console.log("📤 调用endPlayerTurn来进入下一个玩家");
               try {
                 const data = await endPlayerTurn();
                 setTurn(data.turn);
@@ -1180,7 +1091,6 @@ export default function App() {
         setTimeout(async () => {
           setIsMoving(false);
           if (isMultiplayer && roomId) {
-            console.log("📤 调用endPlayerTurn来进入下一个玩家");
             try {
               const data = await endPlayerTurn();
               setTurn(data.turn);
@@ -1693,12 +1603,13 @@ export default function App() {
 
         <EventModal
           activeEvent={activeEvent}
+          isCurrentPlayerTurn={!isMultiplayer || currentPlayerIndex === turn}
           applyEventEffect={async () => {
             if (!activeEvent) return;
 
-            // 多人游戏：非回合玩家不能确认事件（只能观看）
+            // 多人游戏：非回合玩家直接关闭本地弹窗，等待回合玩家处理后服务端广播结果
             if (isMultiplayer && currentPlayerIndex !== turn) {
-              addLog(`⏳ 等待玩家 ${turn + 1} 处理事件...`);
+              setActiveEvent(null);
               return;
             }
 

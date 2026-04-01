@@ -26,7 +26,6 @@ export default function RoomLobby({
     room,
     players,
     isCreator,
-    startGame,
     leaveRoom,
     subscribe,
     error,
@@ -65,14 +64,12 @@ export default function RoomLobby({
 
   // 加载房间数据和订阅实时更新
   useEffect(() => {
-    console.log("📍 RoomLobby: 加载房间数据", roomId);
     loadRoom(roomId);
     const unsubscribe = subscribe(roomId);
 
     // 备用轮询机制：每2秒重新加载一次，确保看到新加入的玩家
     // 这是为了解决 Realtime 在某些情况下可能延迟的问题
     const pollInterval = setInterval(() => {
-      console.log("🔄 RoomLobby: 定期查询最新房间数据（轮询）");
       loadRoom(roomId);
     }, 2000);
 
@@ -82,36 +79,9 @@ export default function RoomLobby({
     };
   }, [roomId, loadRoom]);
 
-  // 监听房间对象变化
-  useEffect(() => {
-    console.log("📍 RoomLobby: room 对象更新", {
-      roomId: room?.id,
-      state: room?.state,
-      room: room,
-    });
-  }, [room]);
-
-  // 监听玩家列表变化
-  useEffect(() => {
-    console.log("👥 RoomLobby: 玩家列表更新", {
-      count: players.length,
-      players: players.map((p) => ({
-        id: p.id,
-        name: p.player_name,
-        index: p.player_index,
-      })),
-    });
-  }, [players]);
-
   // 监听房间状态变化：当游戏开始时自动跳转
   useEffect(() => {
-    console.log("📍 RoomLobby: 检查房间状态", {
-      roomExists: !!room,
-      state: room?.state,
-      shouldStart: room && room.state === "playing",
-    });
     if (room && room.state === "playing") {
-      console.log("🎮 Room state changed to PLAYING, triggering onStartGame");
       onStartGameRef.current?.();
     }
   }, [room?.state]);
@@ -133,10 +103,6 @@ export default function RoomLobby({
   const handleStartGame = async () => {
     setLoading(true);
     try {
-      // 先重新加载最新房间数据，确保配置改动已生效
-      await loadRoom(roomId);
-
-      await startGame();
       onStartGame?.();
     } catch (err) {
       console.error("Failed to start game:", err);
