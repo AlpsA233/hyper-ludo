@@ -799,35 +799,72 @@ export async function POST(request: NextRequest) {
 
     // 验证授权（从 Authorization header 获取用户信息）
     const authHeader = request.headers.get("Authorization");
-    console.log("🔐 Authorization header:", authHeader ? "存在" : "不存在");
+    const devUserId = request.headers.get("X-Dev-User-Id");
+    const isDevMode =
+      process.env.NEXT_PUBLIC_DEV_SKIP_AUTH === "true" &&
+      process.env.NODE_ENV !== "production";
+    console.log(
+      "🔐 Authorization header:",
+      authHeader ? "存在" : "不存在",
+      "Dev mode:",
+      isDevMode,
+    );
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    let userId: string;
+
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      // 正常认证流程
+      const token = authHeader.replace("Bearer ", "");
+      console.log("🔑 Token (前20字符):", token.substring(0, 20) + "...");
+
+      const {
+        data: { user },
+        error: authError,
+      } = await supabaseAdmin.auth.getUser(token);
+
+      if (authError || !user) {
+        console.error("❌ 认证失败:", authError?.message || "用户不存在");
+        return NextResponse.json(
+          { error: "Unauthorized", details: authError?.message },
+          { status: 401 },
+        );
+      }
+
+      userId = user.id;
+      console.log("✅ 用户认证成功:", userId);
+    } else if (isDevMode && devUserId) {
+      // 开发模式：确保 dev 用户在 auth.users 中存在（绕过 FK 约束）
+      const devEmail = `dev-${devUserId.slice(-6)}@hyper-ludo.local`;
+      const { data: existingUser } =
+        await supabaseAdmin.auth.admin.getUserById(devUserId);
+      if (!existingUser?.user) {
+        // 创建 dev 用户，指定 UUID 以保持客户端/服务端一致
+        const { data: newUser, error: createErr } =
+          await supabaseAdmin.auth.admin.createUser({
+            id: devUserId,
+            email: devEmail,
+            password: "dev-only-not-for-production",
+            email_confirm: true,
+            user_metadata: { name: "Dev Player" },
+          });
+        if (createErr) {
+          console.error("❌ 创建 dev 用户失败:", createErr.message);
+          return NextResponse.json(
+            { error: "Failed to create dev user", details: createErr.message },
+            { status: 500 },
+          );
+        }
+        console.log("🛠️ 已创建 dev 用户:", newUser.user?.id);
+      }
+      userId = devUserId;
+      console.log("🛠️ 开发模式认证，使用 dev userId:", userId);
+    } else {
       console.error("❌ 缺少或格式错误的 Authorization header");
       return NextResponse.json(
         { error: "Missing authorization header" },
         { status: 401 },
       );
     }
-
-    // 从 token 获取用户信息
-    const token = authHeader.replace("Bearer ", "");
-    console.log("🔑 Token (前20字符):", token.substring(0, 20) + "...");
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      console.error("❌ 认证失败:", authError?.message || "用户不存在");
-      return NextResponse.json(
-        { error: "Unauthorized", details: authError?.message },
-        { status: 401 },
-      );
-    }
-
-    const userId = user.id;
-    console.log("✅ 用户认证成功:", userId);
     let result;
 
     switch (action) {

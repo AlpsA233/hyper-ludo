@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Play, Copy, Check, X, LogOut, Settings } from "lucide-react";
 import type { Translations } from "@/app/locales";
-import { useRoom, type RoomInfo, type RoomPlayer } from "@/app/hooks/useRoom";
+import { useRoom, type RoomInfo, type RoomPlayer } from "@/app/hooks/useRoomWs";
 
 interface RoomLobbyProps {
   roomId: string;
@@ -151,11 +151,26 @@ export default function RoomLobby({
   };
 
   const copyRoomCode = () => {
-    if (room?.room_code) {
-      navigator.clipboard.writeText(room.room_code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+    if (!room?.room_code) return;
+    const code = room.room_code;
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(code).catch(() => fallbackCopy(code));
+    } else {
+      fallbackCopy(code);
     }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const fallbackCopy = (text: string) => {
+    const el = document.createElement("textarea");
+    el.value = text;
+    el.style.position = "fixed";
+    el.style.opacity = "0";
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand("copy");
+    document.body.removeChild(el);
   };
 
   if (!room) {

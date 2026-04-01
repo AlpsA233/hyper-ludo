@@ -3,10 +3,23 @@
 import React, { useState } from "react";
 import { Plus, LogIn, Copy, Check, X } from "lucide-react";
 import type { Translations } from "@/app/locales";
-import { useRoom } from "@/app/hooks/useRoom";
 
 interface RoomManagerProps {
-  userId: string | null;
+  createRoom: (
+    config: {
+      num_players: number;
+      dice_count: number;
+      laps_to_win: number;
+      initial_cards: number;
+      event_density: number;
+    },
+    playerName?: string,
+  ) => Promise<string>;
+  joinRoom: (
+    roomCode: string,
+    playerName: string,
+    avatar: string,
+  ) => Promise<string>;
   numPlayers: number;
   diceCount: number;
   lapsToWin: number;
@@ -19,7 +32,8 @@ interface RoomManagerProps {
 }
 
 export default function RoomManager({
-  userId,
+  createRoom,
+  joinRoom,
   numPlayers,
   diceCount,
   lapsToWin,
@@ -30,8 +44,6 @@ export default function RoomManager({
   onCancel,
   t,
 }: RoomManagerProps) {
-  const { createRoom, joinRoom } = useRoom(userId);
-
   const [mode, setMode] = useState<"select" | "create" | "join">("select");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

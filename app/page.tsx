@@ -8,8 +8,7 @@ import { useLanguage } from "@/app/hooks/useLanguage";
 import { useDeviceShake } from "@/app/hooks/useDeviceShake";
 import { useAuth } from "@/app/hooks/useAuth";
 import { useUserData } from "@/app/hooks/useUserData";
-import { useRoom } from "@/app/hooks/useRoom";
-import { usePartyRoom } from "@/app/hooks/usePartyRoom";
+import { useRoom } from "@/app/hooks/useRoomWs";
 import { supabase } from "@/app/lib/supabase";
 import {
   Dice1,
@@ -121,7 +120,30 @@ export default function App() {
     continueAsGuest,
   } = useAuth();
 
-  const [guestMode, setGuestMode] = useState(false);
+  const [guestMode, setGuestMode] = useState(
+    process.env.NEXT_PUBLIC_DEV_SKIP_AUTH === "true",
+  );
+
+  // 开发/游客模式下，每个浏览器会话生成唯一 userId（持久化到 localStorage）
+  const [guestUserId] = useState<string>(() => {
+    const genUUID = () => {
+      if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return crypto.randomUUID();
+      }
+      // HTTP 下 crypto.randomUUID 不可用，手动生成
+      return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+      });
+    };
+    if (typeof window === "undefined") return genUUID();
+    const stored = localStorage.getItem("guest-user-id");
+    if (stored) return stored;
+    const newId = genUUID();
+    localStorage.setItem("guest-user-id", newId);
+    return newId;
+  });
+  const effectiveUserId = user?.id || (guestMode ? guestUserId : null);
 
   // 用户数据同步（云端或本地）
   const userData = useUserData(
@@ -141,24 +163,22 @@ export default function App() {
     leaveRoom,
     startGame: startMultiplayerGame,
     rollDice: roomRollDice,
-    releaseDiceLock,
+    movePlayer: roomMovePlayer,
+    triggerEvent: roomTriggerEvent,
+    useCard: roomUseCard,
+    setWinner: roomSetWinner,
     subscribe,
     loadRoom,
     endPlayerTurn,
-  } = useRoom(user?.id || null);
+  } = useRoom(effectiveUserId);
 
   const [roomId, setRoomId] = useState<string | null>(null);
-
-  // Ably WebSocket 多人游戏（实时对战）
-  const partyRoom = usePartyRoom(roomId);
 
   // 多人游戏状态跟踪
   const [isMultiplayer, setIsMultiplayer] = useState(false);
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState<number | null>(
     null,
   );
-  // Ably 实时对战模式 - 当 Ably 连接成功时启用
-  const [useAbly, setUseAbly] = useState(false);
 
   // 检测是否为PC端（屏幕宽度 >= 1024px）
   const [isPC, setIsPC] = useState(false);
@@ -199,20 +219,6 @@ export default function App() {
   const diceRefs = useRef<(HTMLDivElement | null)[]>([]);
   const piecesRef = useRef<(HTMLDivElement | null)[]>([]);
   const logsContainerRef = useRef<HTMLDivElement>(null);
-  // 用于防止多人游戏中重复播放同一次掷骰动画
-  const lastAnimatedDiceRef = useRef<string | null>(null);
-
-  // 🔧 修复轮询闭包问题：使用 ref 跟踪最新值，避免 stale closure
-  const turnRef = useRef(turn);
-  const isRollingRef = useRef(isRolling);
-  const isMovingRef = useRef(isMoving);
-  const numPlayersRef = useRef(numPlayers);
-
-  // 当这些值变化时，同步更新 ref
-  useEffect(() => { turnRef.current = turn; }, [turn]);
-  useEffect(() => { isRollingRef.current = isRolling; }, [isRolling]);
-  useEffect(() => { isMovingRef.current = isMoving; }, [isMoving]);
-  useEffect(() => { numPlayersRef.current = numPlayers; }, [numPlayers]);
 
   // 摇一摇掷骰子（只在游戏中且没有弹窗时启用）
   const {
@@ -379,174 +385,78 @@ export default function App() {
     };
   }, [roomId, subscribe]);
 
-  // ============================================================
-  // Ably WebSocket 加入房间
-  // 当进入房间大厅或开始游戏时，通过 WebSocket 加入 Ably 房间
-  // ============================================================
-  useEffect(() => {
-    if (!roomId || !user?.id || !partyRoom.isConnected) return;
-
-    // 获取当前玩家的房间信息
-    const myRoomPlayer = roomPlayers.find((p) => p.user_id === user.id);
-    if (!myRoomPlayer) {
-      console.log("⚡ [Ably] 等待玩家信息加载...");
-      return;
-    }
-
-    console.log("⚡ [Ably] 发送 join 消息:", {
-      userId: user.id,
-      playerName: myRoomPlayer.player_name,
-      playerIndex: myRoomPlayer.player_index,
-      colorIndex: myRoomPlayer.color_index,
-      avatar: myRoomPlayer.avatar,
-    });
-
-    partyRoom.join(
-      user.id,
-      myRoomPlayer.player_name || user.user_metadata?.name || "Player",
-      myRoomPlayer.player_index,
-      myRoomPlayer.color_index,
-      myRoomPlayer.avatar || "👤",
-    );
-  }, [roomId, user?.id, partyRoom.isConnected, roomPlayers]);
-
-  // ============================================================
-  // Ably 游戏开始 - 房间创建者通知 Ably 服务器开始游戏
-  // ============================================================
-  useEffect(() => {
-    // 当游戏阶段变为 playing 且是房间创建者时，通知 Ably 开始游戏
-    if (
-      phase === "playing" &&
-      isCreator &&
-      roomId &&
-      partyRoom.isConnected &&
-      partyRoom.phase === "waiting"
-    ) {
-      console.log("⚡ [Ably] 房间创建者发送 start_game:", {
-        lapsToWin,
-        eventDensity,
-      });
-      partyRoom.startGame(lapsToWin, eventDensity);
-    }
-  }, [phase, isCreator, roomId, partyRoom.isConnected, partyRoom.phase, lapsToWin, eventDensity]);
-
   // 计算当前玩家索引 - 单独的 effect，在 roomPlayers 变化时运行
   useEffect(() => {
-    if (!roomId || !room || roomPlayers.length === 0 || !user?.id) return;
+    if (!roomId || !room || roomPlayers.length === 0 || !effectiveUserId)
+      return;
 
-    const myIndex = roomPlayers.findIndex((p) => p.user_id === user.id);
+    const myIndex = roomPlayers.findIndex((p) => p.user_id === effectiveUserId);
     setCurrentPlayerIndex(myIndex >= 0 ? myIndex : null);
     if (myIndex >= 0) {
       console.log("👤 当前玩家索引:", myIndex);
     }
-  }, [roomPlayers, user?.id, room, roomId]);
+  }, [roomPlayers, effectiveUserId, room, roomId]);
 
   // 检测房间状态变化：如果房间状态变为 "playing" 且客户端还在 lobby，自动启动游戏
+  // 直接使用 WS hook 已同步到的 room/roomPlayers/gameState，不再调 HTTP API
   useEffect(() => {
     if (!room || !roomId || phase !== "room_lobby") return;
+    if (room.state !== "playing") return;
+    // 等待 players_update 和 game_update 也到达（WS 顺序广播，通常几毫秒内）
+    if (!roomPlayers.length || !gameState) return;
 
-    if (room.state === "playing") {
-      console.log("🎮 检测到房间已开始，自动加载游戏状态");
+    console.log("🎮 检测到房间已开始，从 WS 数据初始化游戏状态", {
+      boardTiles: gameState.board_tiles?.length,
+      players: roomPlayers.length,
+    });
 
-      // 调用 API 获取游戏状态和 boardTiles
-      const loadGameState = async () => {
-        try {
-          const token =
-            (await supabase.auth.getSession())?.data.session?.access_token ||
-            "";
+    // 初始化游戏配置（来自 WS room 对象）
+    setNumPlayers(room.num_players);
+    setDiceCount(room.dice_count);
+    setLapsToWin(room.laps_to_win);
+    setInitialCards(room.initial_cards);
+    setEventDensity(room.event_density);
 
-          // 获取 boardTiles 和房间信息
-          const response = await fetch("/api/rooms", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              action: "startGame",
-              roomId,
-            }),
-          });
+    // 初始化玩家数据（来自 WS roomPlayers）
+    const gamePlayers: Player[] = [...roomPlayers]
+      .sort((a, b) => a.player_index - b.player_index)
+      .map((rp) => ({
+        id: rp.player_index,
+        color: COLORS[rp.color_index % COLORS.length],
+        pos: -1,
+        lap: 0,
+        startPos: 0,
+        shield: false,
+        skipTurn: false,
+        cards: Array.from({ length: room.initial_cards || initialCards }).map(() => {
+          const baseCard =
+            userData.cardDatabase[
+              Math.floor(Math.random() * userData.cardDatabase.length)
+            ];
+          return {
+            id: baseCard.id,
+            rarity: baseCard.rarity as "NR" | "R" | "SR" | "SSR",
+            name: baseCard.name,
+            desc: baseCard.desc,
+            pattern: baseCard.pattern,
+            target: baseCard.target,
+            effect: baseCard.effect,
+          } as Card;
+        }),
+        avatar: rp.avatar || ["🔵", "🟣", "🟡", "🟢"][rp.player_index % 4],
+        name: rp.player_name || `Player ${rp.player_index + 1}`,
+      }));
+    setPlayers(gamePlayers);
+    setTurn(0);
 
-          if (!response.ok) {
-            throw new Error(`Failed to load game state: ${response.status}`);
-          }
-
-          const data = await response.json();
-          const {
-            room: updatedRoom,
-            players: updatedPlayers,
-            boardTiles: serverBoardTiles,
-            currentTurn: serverTurn,
-          } = data;
-
-          console.log("✅ 游戏状态加载成功", {
-            boardTiles: serverBoardTiles?.length,
-            players: updatedPlayers?.length,
-          });
-
-          // 初始化游戏配置
-          if (updatedRoom) {
-            setNumPlayers(updatedRoom.num_players);
-            setDiceCount(updatedRoom.dice_count);
-            setLapsToWin(updatedRoom.laps_to_win);
-            setInitialCards(updatedRoom.initial_cards);
-            setEventDensity(updatedRoom.event_density);
-          }
-
-          // 初始化玩家数据
-          if (updatedPlayers && updatedPlayers.length > 0) {
-            const gamePlayers: Player[] = updatedPlayers
-              .sort((a: any, b: any) => a.player_index - b.player_index)
-              .map((rp: any) => ({
-                id: rp.player_index,
-                color: COLORS[rp.color_index % COLORS.length],
-                pos: -1,
-                lap: 0,
-                startPos: 0,
-                shield: false,
-                skipTurn: false,
-                cards: Array.from({
-                  length: updatedRoom?.initial_cards || initialCards,
-                }).map(() => {
-                  const baseCard =
-                    userData.cardDatabase[
-                      Math.floor(Math.random() * userData.cardDatabase.length)
-                    ];
-                  return {
-                    id: baseCard.id,
-                    rarity: baseCard.rarity as "NR" | "R" | "SR" | "SSR",
-                    name: baseCard.name,
-                    desc: baseCard.desc,
-                    pattern: baseCard.pattern,
-                    target: baseCard.target,
-                    effect: baseCard.effect,
-                  } as Card;
-                }),
-                avatar:
-                  rp.avatar || ["🔵", "🟣", "🟡", "🟢"][rp.player_index % 4],
-                name: rp.player_name || `Player ${rp.player_index + 1}`,
-              }));
-            setPlayers(gamePlayers);
-            // 从服务器获取当前回合（避免重连时从 0 开始）
-            setTurn(serverTurn ?? 0);
-          }
-
-          // 设置 boardTiles
-          if (serverBoardTiles && serverBoardTiles.length > 0) {
-            setBoardTiles(serverBoardTiles);
-          }
-
-          // 切换到游戏阶段
-          setPhase("playing");
-        } catch (error) {
-          console.error("❌ 加载游戏状态失败:", error);
-        }
-      };
-
-      loadGameState();
+    // 设置 boardTiles（来自 WS gameState.board_tiles）
+    if (gameState.board_tiles?.length > 0) {
+      setBoardTiles(gameState.board_tiles);
     }
-  }, [room?.state, roomId, phase, supabase, userData, initialCards]);
+
+    // 切换到游戏阶段
+    setPhase("playing");
+  }, [room?.state, roomId, phase, roomPlayers, gameState, userData, initialCards]);
 
   // 多人游戏：当 gameState 变化时，同步本地状态
   useEffect(() => {
@@ -606,40 +516,15 @@ export default function App() {
 
     // 如果掷骰完成，更新 phase 为 "moving"
     if (gameState.phase === "moving" && !isMoving && !isRolling) {
-      const results = gameState.dice_results;
-      const value = gameState.dice_value;
-      const rollerIndex = gameState.dice_roller_index;
-
-      // 非操作玩家：播放骰子动画
-      if (
-        rollerIndex !== undefined &&
-        rollerIndex !== null &&
-        currentPlayerIndex !== rollerIndex &&
-        results &&
-        results.length > 0
-      ) {
-        const animKey = `${rollerIndex}_${JSON.stringify(results)}_${gameState.dice_rolled_at}`;
-        if (lastAnimatedDiceRef.current !== animKey) {
-          lastAnimatedDiceRef.current = animKey;
-          console.log(
-            "🎲 [非操作玩家] 播放掷骰动画:",
-            results,
-            "总计:",
-            value,
-            "掷骰者:",
-            rollerIndex,
-          );
-          setIsRolling(true);
-          animateDiceRoll(results).then(() => {
-            setDiceValue(value);
-            setDiceResults(results);
-            addLog(
-              `Player ${rollerIndex + 1} rolled ${results.length === 1 ? value : results.join(", ") + ` (总计: ${value})`}`,
-            );
-            setIsRolling(false);
-          });
-        }
-      }
+      // 其他玩家看到掷骰结果，不再显示动画
+      console.log(
+        "📍 [Phase Moving] 其他玩家看到掷骰结果:",
+        gameState.dice_value,
+        gameState.dice_results,
+      );
+      addLog(
+        `Player ${gameState.turn + 1} rolled ${gameState.dice_results?.length === 1 ? gameState.dice_value : gameState.dice_results?.join(", ") + ` (总计: ${gameState.dice_value})`}`,
+      );
     }
 
     // 同步事件：非当前回合玩家收到事件弹窗
@@ -691,176 +576,6 @@ export default function App() {
     }
   }, [gameState, isMultiplayer, isMoving, isRolling]);
 
-  // ============================================================
-  // Ably 实时状态同步
-  // 当 Ably 连接且 roomState 更新时，同步到本地 React state
-  // ============================================================
-  useEffect(() => {
-    // 仅在 Ably 模式下处理
-    if (!useAbly || !partyRoom.isConnected || !partyRoom.roomState) return;
-
-    const rs = partyRoom.roomState;
-    console.log("⚡ [Ably Sync] 收到服务器状态:", {
-      type: partyRoom.phase,
-      currentTurn: rs.currentTurn,
-      turn,
-      diceValue: rs.diceValue,
-      diceResults: rs.diceResults,
-      players: rs.players?.length,
-      activeEvent: rs.activeEvent?.text,
-      winner: rs.winner,
-      timestamp: new Date().toLocaleTimeString(),
-    });
-
-    // 同步回合
-    if (rs.currentTurn !== turn) {
-      console.log(`⚡ [Ably Sync] 回合更新: ${turn} → ${rs.currentTurn}`);
-      setTurn(rs.currentTurn);
-      setHasUsedCard(false);
-    }
-
-    // 同步骰子结果
-    if (rs.diceResults && rs.diceResults.length > 0) {
-      if (JSON.stringify(rs.diceResults) !== JSON.stringify(diceResults)) {
-        console.log(
-          "⚡ [Ably Sync] 骰子结果更新:",
-          diceResults,
-          "→",
-          rs.diceResults,
-        );
-        setDiceResults(rs.diceResults);
-      }
-    }
-
-    if (rs.diceValue !== undefined && rs.diceValue !== diceValue) {
-      console.log(
-        "⚡ [Ably Sync] 骰子总值更新:",
-        diceValue,
-        "→",
-        rs.diceValue,
-      );
-      if (rs.diceValue !== undefined && rs.diceValue !== null) {
-        setDiceValue(rs.diceValue);
-      }
-    }
-
-    // 同步棋盘瓷砖（游戏开始时）
-    // 注意：Ably 是权威状态源，boardTiles 应该始终以 Ably 的为准
-    if (rs.boardTiles && rs.boardTiles.length > 0) {
-      console.log(
-        "⚡ [Ably Sync] 棋盘瓷砖同步:",
-        rs.boardTiles.length,
-        "块 (使用 Ably 权威版本)",
-      );
-      setBoardTiles(rs.boardTiles);
-    }
-
-    // 同步玩家位置
-    if (rs.players && rs.players.length > 0) {
-      setPlayers((prev) => {
-        if (prev.length === 0) return prev;
-        const next = [...prev];
-        let changed = false;
-        rs.players.forEach((rp) => {
-          const idx = rp.playerIndex;
-          if (idx < 0 || idx >= next.length) return;
-          // 跳过当前正在移动的玩家
-          if (isMoving && idx === turn) return;
-          const existingPlayer = next[idx];
-          if (!existingPlayer) return;
-          const needsUpdate =
-            rp.position !== existingPlayer.pos ||
-            rp.lap !== existingPlayer.lap ||
-            rp.skipTurn !== existingPlayer.skipTurn;
-          if (needsUpdate) {
-            next[idx] = {
-              ...existingPlayer,
-              pos: rp.position ?? existingPlayer.pos,
-              lap: rp.lap ?? existingPlayer.lap,
-              skipTurn: rp.skipTurn ?? existingPlayer.skipTurn,
-              cards: rp.cards && rp.cards.length > 0 ? rp.cards : existingPlayer.cards,
-            };
-            changed = true;
-          }
-        });
-        return changed ? next : prev;
-      });
-    }
-
-    // 同步事件
-    if (rs.activeEvent && partyRoom.phase === "event") {
-      // 非操作玩家：显示事件弹窗
-      if (currentPlayerIndex !== turn) {
-        console.log("⚡ [Ably Sync] 收到事件:", rs.activeEvent);
-        setActiveEvent({
-          id: rs.activeEvent.id,
-          text: rs.activeEvent.text,
-          type: rs.activeEvent.type,
-          val: rs.activeEvent.val,
-          target: rs.activeEvent.target || "SELF",
-          color: rs.activeEvent.color || "#8b5cf6",
-        });
-        if (phase !== "event") setPhase("event");
-      }
-    }
-
-    // 事件已清除
-    if (!rs.activeEvent && partyRoom.phase === "playing" && activeEvent) {
-      console.log("⚡ [Ably Sync] 事件已清除");
-      setActiveEvent(null);
-      if (phase === "event") setPhase("playing");
-    }
-
-    // 胜利同步
-    if (rs.winner !== null && rs.winner !== undefined) {
-      console.log("⚡ [Ably Sync] 胜利玩家:", rs.winner + 1);
-      setPlayers((prev) => {
-        const winPlayer = prev[rs.winner!];
-        if (winPlayer) {
-          setWinner(winPlayer);
-          setPhase("win");
-        }
-        return prev;
-      });
-    }
-
-    // 清空骰子结果（回合结束时）
-    if (
-      (partyRoom.phase === "playing" || partyRoom.phase === "waiting") &&
-      (rs.diceResults === null || rs.diceResults.length === 0) &&
-      diceResults.length > 0
-    ) {
-      // 仅在没有进行中动画时清除
-      if (!isMoving && !isRolling) {
-        console.log("⚡ [Ably Sync] 清空骰子结果");
-        setDiceResults([]);
-        setDiceValue(1);
-      }
-    }
-  }, [
-    partyRoom.roomState,
-    partyRoom.isConnected,
-    partyRoom.phase,
-    useAbly,
-    turn,
-    diceResults,
-    diceValue,
-    currentPlayerIndex,
-    isMoving,
-    isRolling,
-  ]);
-
-  // Ably 连接状态监控 - 当 WebSocket 连接成功时自动启用 Ably 模式
-  useEffect(() => {
-    if (partyRoom.isConnected && roomId) {
-      console.log("⚡ Ably WebSocket 已连接，启用实时对战模式");
-      setUseAbly(true);
-    } else if (!partyRoom.isConnected) {
-      console.log("⚡ Ably WebSocket 已断开，回退到 Supabase 模式");
-      setUseAbly(false);
-    }
-  }, [partyRoom.isConnected, roomId]);
-
   // 多人游戏：同步房间玩家数据到游戏显示（用于左侧玩家部分）
   useEffect(() => {
     if (!isMultiplayer || !roomPlayers || roomPlayers.length === 0) return;
@@ -898,52 +613,6 @@ export default function App() {
       });
     }
   }, [roomPlayers, isMultiplayer, phase]);
-
-  // 多人游戏：定期轮询 room_games 确保 turn 同步（作为 Realtime 的可靠备份）
-  // 解决 Realtime 未能送达时 Player 2 看不到回合更新的问题
-  // 🔧 修复：使用 ref 避免 stale closure 问题，减少依赖项
-  useEffect(() => {
-    if (!isMultiplayer || !roomId || phase !== "playing") return;
-
-    const pollGameState = async () => {
-      // 正在掷骰或移动中，跳过以避免干扰动画
-      // 🔧 使用 ref 获取最新值，避免闭包中的旧值
-      if (isRollingRef.current || isMovingRef.current) return;
-
-      try {
-        const token =
-          (await supabase.auth.getSession())?.data.session?.access_token || "";
-        const response = await fetch("/api/rooms", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ action: "getGameState", roomId }),
-        });
-
-        if (!response.ok) return;
-
-        const { gameState: remoteState } = await response.json();
-        if (!remoteState) return;
-
-        // 🔧 使用 ref 获取最新 turn 值
-        // 如果服务器 turn 与本地不一致，强制同步
-        if (remoteState.turn !== undefined && remoteState.turn !== turnRef.current) {
-          console.log(
-            `🔄 [Poll] 游戏回合同步: ${turnRef.current} → ${remoteState.turn}`,
-          );
-          setTurn(remoteState.turn);
-          setHasUsedCard(false);
-        }
-      } catch {
-        // 轮询失败静默忽略，Realtime 可能仍在工作
-      }
-    };
-
-    const interval = setInterval(pollGameState, 2000);
-    return () => clearInterval(interval);
-  }, [isMultiplayer, roomId, phase]); // 🔧 减少依赖项，避免频繁重建
 
   const totalSteps = useMemo(() => numPlayers * 10, [numPlayers]);
   const center = { x: 400, y: 400 };
@@ -1005,7 +674,7 @@ export default function App() {
         color: COLORS[i],
         pos: -1,
         lap: 0,
-        startPos: 0, // 所有玩家从同一起点出发，方向一致
+        startPos: Math.floor(totalSteps / numPlayers) * i, // 记录每个玩家的起始位置
         shield: false,
         skipTurn: false,
         avatar: userData.playerAvatars[i] || "👤", // 应用玩家头像设置
@@ -1150,32 +819,9 @@ export default function App() {
 
     // 多人游戏：同步卡牌效果到服务器
     if (isMultiplayer && roomId) {
-      // ============================================================
-      // Ably WebSocket 模式
-      // ============================================================
-      if (useAbly && partyRoom.isConnected && currentPlayerIndex !== null) {
-        console.log("⚡ Ably 模式：发送 useCard", { card: card.name });
-        partyRoom.useCard(currentPlayerIndex, card, targetId ?? undefined);
-      } else {
-        // ============================================================
-        // Supabase API 回退模式
-        // ============================================================
-        supabase.auth.getSession().then(({ data }) => {
-          const token = data.session?.access_token || "";
-          fetch("/api/rooms", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              action: "useCard",
-              roomId,
-              cardEffect: { card, playerUpdates },
-            }),
-          }).catch((err) => console.error("❌ useCard同步失败:", err));
-        });
-      }
+      roomUseCard({ card, playerUpdates }).catch((err) =>
+        console.error("❌ useCard同步失败:", err),
+      );
     }
 
     // 如果是对自己使用移动卡牌，播放移动动画
@@ -1239,145 +885,45 @@ export default function App() {
     setDiceResults([]); // 清除上一次的掷骰结果
 
     try {
-      // 多人游戏：调用服务器 API 生成掷骰结果
+      // 多人游戏：通过 WebSocket 生成掷骰结果
       if (isMultiplayer && roomId) {
-        // ============================================================
-        // Ably WebSocket 实时对战模式
-        // ============================================================
-        if (useAbly && partyRoom.isConnected && currentPlayerIndex !== null) {
-          console.log("⚡ Ably 模式：发送 rollDice 请求", {
-            playerIndex: currentPlayerIndex,
-            diceCount,
+        console.log("🎲 多人模式：调用 WS rollDice，diceCount:", diceCount);
+        try {
+          const { diceValue: apiDiceValue, diceResults: apiDiceResults } =
+            await roomRollDice(diceCount);
+          console.log("📡 服务器掷骰结果:", {
+            diceValue: apiDiceValue,
+            diceResults: apiDiceResults,
           });
 
-          try {
-            // 通过 WebSocket 发送掷骰请求
-            // 服务器会生成结果并广播给所有客户端
-            partyRoom.rollDice(currentPlayerIndex, diceCount);
+          if (
+            (window as any).gsap &&
+            apiDiceResults &&
+            apiDiceResults.length > 0
+          ) {
+            await animateDiceRoll(apiDiceResults);
+            setDiceValue(apiDiceValue);
+            setDiceResults(apiDiceResults);
 
-            // 等待服务器广播结果（通过 sync effect 更新本地状态）
-            // 最多等待 2 秒
-            let waitCount = 0;
-            const maxWait = 40; // 40 * 50ms = 2s
-            while ((!partyRoom.diceResults || partyRoom.diceResults.length === 0) && waitCount < maxWait) {
-              await new Promise(resolve => setTimeout(resolve, 50));
-              waitCount++;
-            }
+            const resultString =
+              diceCount === 1
+                ? `${apiDiceValue}`
+                : `${apiDiceResults.join(", ")} (总计: ${apiDiceValue})`;
+            addLog(`Player ${turn + 1} rolled ${resultString}`);
 
-            const results = partyRoom.diceResults || [];
-            const value = partyRoom.diceValue || 1;
-
-            console.log("⚡ Ably 收到服务器骰子结果:", { value, results, waitCount });
-
-            // 播放骰子动画
-            if ((window as any).gsap && results.length > 0) {
-              console.log("▶️  开始播放骰子动画...");
-              await animateDiceRoll(results);
-              setDiceValue(value);
-              setDiceResults(results);
-
-              const resultString =
-                diceCount === 1
-                  ? `${value}`
-                  : `${results.join(", ")} (总计: ${value})`;
-              addLog(`Player ${turn + 1} rolled ${resultString}`);
-
-              console.log("✅ 动画完成，调用 handleMove 移动玩家");
-              setIsRolling(false);
-              handleMove(value);
-            } else {
-              console.error("❌ 无法播放动画或无结果:", {
-                hasGsap: !!(window as any).gsap,
-                results,
-              });
-              setIsRolling(false);
-              // 即使没有动画，也尝试移动
-              handleMove(value);
-            }
-          } catch (err) {
-            console.error("❌ Ably rollDice 异常:", err);
-            addLog("❌ 掷骰子失败，请重试");
             setIsRolling(false);
-          }
-        } else {
-          // ============================================================
-          // Supabase API 回退模式
-          // ============================================================
-          console.log("🎲 多人模式（Supabase API）：调用 rollDice API，diceCount:", diceCount);
-          try {
-            const response = await fetch("/api/rooms", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${(await supabase.auth.getSession())?.data.session?.access_token || ""}`,
-              },
-              body: JSON.stringify({
-                action: "rollDice",
-                roomId,
-                diceCount,
-              }),
-            });
-
-            if (!response.ok) {
-              const errorData = await response.json();
-              console.error(
-                "❌ rollDice API错误 (" + response.status + "):",
-                errorData.error,
-              );
-              addLog("❌ 掷骰子失败，请重试");
-              setIsRolling(false);
-              return;
-            }
-
-            const { diceValue: apiDiceValue, diceResults: apiDiceResults } =
-              await response.json();
-            console.log("📡 服务器掷骰结果:", {
-              diceValue: apiDiceValue,
-              diceResults: apiDiceResults,
-              length: apiDiceResults?.length,
+            handleMove(apiDiceValue);
+          } else {
+            console.error("❌ 无法播放动画:", {
               hasGsap: !!(window as any).gsap,
+              apiDiceResults,
             });
-
-            // 使用服务器返回的结果显示动画
-            if (
-              (window as any).gsap &&
-              apiDiceResults &&
-              apiDiceResults.length > 0
-            ) {
-              console.log("▶️  开始播放骰子动画...");
-              await animateDiceRoll(apiDiceResults);
-              setDiceValue(apiDiceValue);
-              setDiceResults(apiDiceResults);
-
-              const resultString =
-                diceCount === 1
-                  ? `${apiDiceValue}`
-                  : `${apiDiceResults.join(", ")} (总计: ${apiDiceValue})`;
-              addLog(`Player ${turn + 1} rolled ${resultString}`);
-
-              console.log("✅ 动画完成，释放掷骰锁并调用handleMove移动玩家");
-              setIsRolling(false);
-
-              // 释放掷骰状态锁
-              await releaseDiceLock();
-
-              handleMove(apiDiceValue);
-            } else {
-              console.error("❌ 无法播放动画:", {
-                hasGsap: !!(window as any).gsap,
-                apiDiceResults,
-              });
-              setIsRolling(false);
-              // 释放掷骰锁
-              await releaseDiceLock();
-            }
-          } catch (err) {
-            console.error("❌ rollDice API异常:", err);
-            addLog("❌ 掷骰子失败，请重试");
             setIsRolling(false);
-            // 释放掷骰锁
-            await releaseDiceLock();
           }
+        } catch (err) {
+          console.error("❌ rollDice WS异常:", err);
+          addLog("❌ 掷骰子失败，请重试");
+          setIsRolling(false);
         }
       } else {
         // 单人游戏：本地生成掷骰结果
@@ -1504,45 +1050,13 @@ export default function App() {
     // 使用统一的位置计算函数
     const { pos: finalPos, lap: newLap } = calculateNewPosition(p, steps);
 
-    // 多人游戏：先同步位置到服务器，其他玩家通过 roomPlayers Realtime 收到更新
+    // 多人游戏：先同步位置到服务器，其他玩家通过 WS broadcast 收到更新
     const syncPositionToServer = async () => {
       if (isMultiplayer && roomId) {
-        // ============================================================
-        // Ably WebSocket 模式
-        // ============================================================
-        if (useAbly && partyRoom.isConnected && currentPlayerIndex !== null) {
-          console.log("⚡ Ably 模式：发送 moveDone", {
-            playerIndex: currentPlayerIndex,
-            position: finalPos,
-            lap: newLap,
-          });
-          // 通过 WebSocket 通知服务器移动完成
-          // 服务器会广播 position 更新，并判断是否触发事件或结束回合
-          partyRoom.moveDone(currentPlayerIndex, finalPos, newLap);
-        } else {
-          // ============================================================
-          // Supabase API 回退模式
-          // ============================================================
-          try {
-            const token =
-              (await supabase.auth.getSession())?.data.session?.access_token ||
-              "";
-            await fetch("/api/rooms", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({
-                action: "movePlayer",
-                roomId,
-                position: finalPos,
-                lapCount: newLap,
-              }),
-            });
-          } catch (err) {
-            console.error("❌ movePlayer同步失败:", err);
-          }
+        try {
+          await roomMovePlayer(finalPos, newLap);
+        } catch (err) {
+          console.error("❌ movePlayer同步失败:", err);
         }
       }
     };
@@ -1569,64 +1083,11 @@ export default function App() {
       addLog(`Player ${turn + 1} moved to pos ${finalPos} (lap ${newLap})`);
       // 同步位置到服务器（包含胜利状态）
       if (hasWon && isMultiplayer && roomId) {
-        // ============================================================
-        // Ably 胜利模式
-        // ============================================================
-        if (useAbly && partyRoom.isConnected && currentPlayerIndex !== null) {
-          console.log("⚡ Ably 模式：发送胜利 moveDone + 胜利广播");
-          partyRoom.moveDone(currentPlayerIndex, finalPos, newLap);
-          // 胜利状态由服务器通过 sync effect 同步
-        } else {
-          // ============================================================
-          // Supabase API 胜利模式
-          // ============================================================
-          supabase.auth.getSession().then(async ({ data }) => {
-            const token = data.session?.access_token || "";
-            // 更新位置
-            await fetch("/api/rooms", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({
-                action: "movePlayer",
-                roomId,
-                position: finalPos,
-                lapCount: newLap,
-              }),
-            }).catch(console.error);
-            // 广播胜利
-            await fetch("/api/rooms", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({
-                action: "setWinner",
-                roomId,
-                winnerIndex: turn,
-              }),
-            }).catch(console.error);
-          });
-        }
+        roomMovePlayer(finalPos, newLap).catch(console.error);
+        roomSetWinner(turn).catch(console.error);
       } else {
         syncPositionToServer();
       }
-
-      // ============================================================
-      // 事件触发和回合结束逻辑
-      // 注意：在 Ably 模式下，这些由服务器广播控制，客户端只需等待 sync
-      // ============================================================
-      if (useAbly && partyRoom.isConnected) {
-        // Ably 模式：服务器会广播 event_triggered 或 turn_ended
-        // 客户端的 sync effect 会处理状态更新，这里不需要做任何事
-        console.log("⚡ Ably 模式：等待服务器广播事件/回合状态");
-        return; // 直接返回，不执行下面的本地事件逻辑
-      }
-
-      // Supabase/本地模式：客户端本地处理事件触发
       // 事件触发: 只在CUSTOM格子上触发
       const isCustomTile =
         finalPos !== -1 && boardTiles[finalPos]?.id === "CUSTOM";
@@ -1662,44 +1123,14 @@ export default function App() {
           // 如果没有允许的事件，跳过事件触发
           if (allowedEvents.length === 0) {
             setIsMoving(false);
-            // 🔧 多人游戏中，调用API来完成这个回合
             if (isMultiplayer && roomId) {
               console.log("📤 调用endPlayerTurn来进入下一个玩家");
               try {
-                // 使用 API 直接调用，而不是依赖 endPlayerTurn hook（它可能缺少 room 状态）
-                const response = await fetch("/api/rooms", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${(await supabase.auth.getSession())?.data.session?.access_token || ""}`,
-                  },
-                  body: JSON.stringify({
-                    action: "endPlayerTurn",
-                    roomId,
-                  }),
-                });
-
-                if (!response.ok) {
-                  const errorData = await response.json();
-                  console.error(
-                    "❌ endPlayerTurn API错误 (" + response.status + "):",
-                    errorData.error,
-                  );
-                  // fallback: 本地更新
-                  setTurn((turn + 1) % numPlayers);
-                  setHasUsedCard(false);
-                } else {
-                  const data = await response.json();
-                  console.log(
-                    "✅ endPlayerTurn 成功，回合已更新到玩家:",
-                    data.turn + 1,
-                  );
-                  setTurn(data.turn);
-                  setHasUsedCard(false);
-                }
+                const data = await endPlayerTurn();
+                setTurn(data.turn);
+                setHasUsedCard(false);
               } catch (err) {
                 console.error("❌ endPlayerTurn 异常:", err);
-                // fallback: 本地更新
                 setTurn((turn + 1) % numPlayers);
                 setHasUsedCard(false);
               }
@@ -1735,71 +1166,27 @@ export default function App() {
 
           // 多人游戏：广播事件到服务器让其他玩家看到弹窗
           if (isMultiplayer && roomId) {
-            const token =
-              (await supabase.auth.getSession())?.data.session?.access_token ||
-              "";
-            fetch("/api/rooms", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({
-                action: "triggerEvent",
-                roomId,
-                event: {
-                  id: event.id,
-                  text: event.text,
-                  type: event.type,
-                  val: event.val,
-                  target: event.target || "SELF",
-                  color: event.color || "#8b5cf6",
-                },
-              }),
+            roomTriggerEvent({
+              id: event.id,
+              text: event.text,
+              type: event.type,
+              val: event.val,
+              target: event.target || "SELF",
+              color: event.color || "#8b5cf6",
             }).catch((err) => console.error("❌ triggerEvent同步失败:", err));
           }
         }, 400);
       } else {
         setTimeout(async () => {
           setIsMoving(false);
-          // 🔧 多人游戏中，调用API来完成这个回合
           if (isMultiplayer && roomId) {
             console.log("📤 调用endPlayerTurn来进入下一个玩家");
             try {
-              // 使用 API 直接调用，而不是依赖 endPlayerTurn hook（它可能缺少 room 状态）
-              const response = await fetch("/api/rooms", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${(await supabase.auth.getSession())?.data.session?.access_token || ""}`,
-                },
-                body: JSON.stringify({
-                  action: "endPlayerTurn",
-                  roomId,
-                }),
-              });
-
-              if (!response.ok) {
-                const errorData = await response.json();
-                console.error(
-                  "❌ endPlayerTurn API错误 (" + response.status + "):",
-                  errorData.error,
-                );
-                // fallback: 本地更新
-                setTurn((turn + 1) % numPlayers);
-                setHasUsedCard(false);
-              } else {
-                const data = await response.json();
-                console.log(
-                  "✅ endPlayerTurn 成功，回合已更新到玩家:",
-                  data.turn + 1,
-                );
-                setTurn(data.turn);
-                setHasUsedCard(false);
-              }
+              const data = await endPlayerTurn();
+              setTurn(data.turn);
+              setHasUsedCard(false);
             } catch (err) {
               console.error("❌ endPlayerTurn 异常:", err);
-              // fallback: 本地更新
               setTurn((turn + 1) % numPlayers);
               setHasUsedCard(false);
             }
@@ -2017,7 +1404,7 @@ export default function App() {
 
         {/* 房间选择 - 创建或加入房间 */}
         {phase === "room_select" &&
-          (!user ? (
+          (!effectiveUserId ? (
             <div className="absolute inset-0 bg-black/80 backdrop-blur-lg flex items-center justify-center p-4">
               <div className="bg-black/60 border border-white/10 rounded-3xl p-8 max-w-sm w-full text-center space-y-4 animate-fade-in">
                 <h3 className="text-xl font-bold">
@@ -2035,7 +1422,8 @@ export default function App() {
             </div>
           ) : (
             <RoomManager
-              userId={user?.id || null}
+              createRoom={createRoom}
+              joinRoom={joinRoom}
               numPlayers={numPlayers}
               diceCount={diceCount}
               lapsToWin={lapsToWin}
@@ -2058,192 +1446,12 @@ export default function App() {
         {phase === "room_lobby" && roomId && (
           <RoomLobby
             roomId={roomId}
-            userId={user?.id || null}
+            userId={effectiveUserId}
             onStartGame={async () => {
               try {
-                // 🔧 关键：在开始游戏前重新加载最新的房间和玩家数据
-                // （因为 RoomLobby 可能刚编辑过配置，而页面的状态可能还没有同步）
-                let latestRoom = room;
-                let latestRoomPlayers = roomPlayers;
-
-                if (roomId) {
-                  console.log("🔄 游戏开始前：重新加载最新房间和玩家数据...");
-                  try {
-                    // 从 API 直接获取最新数据，而不是等待状态更新
-                    const { room: newRoom, players: newPlayers } = await fetch(
-                      "/api/rooms",
-                      {
-                        method: "POST",
-                        headers: {
-                          "Content-Type": "application/json",
-                          Authorization: `Bearer ${(await supabase.auth.getSession())?.data.session?.access_token || ""}`,
-                        },
-                        body: JSON.stringify({
-                          action: "getRoomInfo",
-                          roomId,
-                        }),
-                      },
-                    ).then((res) => res.json());
-
-                    if (newRoom) {
-                      latestRoom = newRoom;
-                      latestRoomPlayers = newPlayers || [];
-                      console.log("✅ 获取最新房间数据成功:", {
-                        num_players: newRoom.num_players,
-                        players: newPlayers?.length || 0,
-                      });
-                    }
-                  } catch (err) {
-                    console.warn("⚠️ 无法获取最新房间数据，使用页面状态:", err);
-                  }
-                }
-
-                // 调用 API 的 startGame 来获取服务器生成的 boardTiles
-                const startGameRes = await fetch("/api/rooms", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${(await supabase.auth.getSession())?.data.session?.access_token || ""}`,
-                  },
-                  body: JSON.stringify({
-                    action: "startGame",
-                    roomId,
-                  }),
-                });
-
-                if (!startGameRes.ok) {
-                  const errorData = await startGameRes.json();
-                  throw new Error(
-                    errorData.error ||
-                      `Failed to start game: ${startGameRes.status}`,
-                  );
-                }
-
-                const startGameResponse = await startGameRes.json();
-                const serverBoardTiles = startGameResponse.boardTiles;
-                console.log("✅ 游戏启动 - 从API获取服务器生成的boardTiles:", {
-                  tilesCount: serverBoardTiles?.length || 0,
-                });
-
-                // 注意：不要调用 loadRoom()，因为 startGame API 已经会更新房间状态
-                // 避免Realtime订阅被中断和重新建立
-                // await loadRoom(roomId);
-                // await new Promise((resolve) => setTimeout(resolve, 100));
-                const numPlayersFromRoom =
-                  latestRoom?.num_players || numPlayers;
-                if (latestRoom) {
-                  setNumPlayers(latestRoom.num_players);
-                  setDiceCount(latestRoom.dice_count);
-                  setLapsToWin(latestRoom.laps_to_win);
-                  setInitialCards(latestRoom.initial_cards);
-                  setEventDensity(latestRoom.event_density);
-                }
-
-                // 初始化游戏玩家数据
-                if (latestRoomPlayers && latestRoomPlayers.length > 0) {
-                  console.log(
-                    "👥 使用房间玩家数据初始化游戏:",
-                    latestRoomPlayers.length,
-                  );
-                  const gamePlayers: Player[] = latestRoomPlayers
-                    .sort((a, b) => a.player_index - b.player_index) // 按索引排序确保顺序一致
-                    .map((rp) => ({
-                      id: rp.player_index,
-                      color: COLORS[rp.color_index % COLORS.length],
-                      pos: -1,
-                      lap: 0,
-                      startPos: 0,
-                      shield: false,
-                      skipTurn: false,
-                      cards: Array.from({
-                        length: latestRoom?.initial_cards || initialCards,
-                      }).map(() => {
-                        const baseCard =
-                          userData.cardDatabase[
-                            Math.floor(
-                              Math.random() * userData.cardDatabase.length,
-                            )
-                          ];
-                        return {
-                          id: baseCard.id,
-                          rarity: baseCard.rarity as "NR" | "R" | "SR" | "SSR",
-                          name: baseCard.name,
-                          desc: baseCard.desc,
-                          pattern: baseCard.pattern,
-                          target: baseCard.target,
-                          effect: baseCard.effect,
-                        } as Card;
-                      }),
-                      avatar:
-                        rp.avatar ||
-                        ["🔵", "🟣", "🟡", "🟢"][rp.player_index % 4],
-                      name: rp.player_name || `Player ${rp.player_index + 1}`,
-                    }));
-                  setPlayers(gamePlayers);
-
-                  // 🔧 关键修复：重新计算当前玩家索引（确保权限检查正确）
-                  const myIndex = latestRoomPlayers.findIndex(
-                    (p) => p.user_id === user?.id,
-                  );
-                  console.log("🎮 游戏开始 - 重新计算当前玩家索引:", {
-                    myIndex,
-                    userId: user?.id,
-                    totalPlayers: latestRoomPlayers.length,
-                  });
-                  setCurrentPlayerIndex(myIndex >= 0 ? myIndex : null);
-
-                  // 确保游戏从玩家0开始
-                  setTurn(0);
-                } else {
-                  // 备用：如果没有房间玩家数据，使用配置的玩家数创建默认玩家
-                  console.log(
-                    "👥 使用默认玩家数据初始化游戏:",
-                    numPlayersFromRoom,
-                  );
-                  const defaultPlayers: Player[] = Array.from({
-                    length: numPlayersFromRoom,
-                  }).map((_, i) => ({
-                    id: i,
-                    color: COLORS[i],
-                    pos: -1,
-                    lap: 0,
-                    startPos: 0,
-                    shield: false,
-                    skipTurn: false,
-                    cards: Array.from({
-                      length: numPlayersFromRoom
-                        ? latestRoom?.initial_cards || initialCards
-                        : initialCards,
-                    }).map(() => {
-                      const baseCard =
-                        userData.cardDatabase[
-                          Math.floor(
-                            Math.random() * userData.cardDatabase.length,
-                          )
-                        ];
-                      return {
-                        id: baseCard.id,
-                        rarity: baseCard.rarity as "NR" | "R" | "SR" | "SSR",
-                        name: baseCard.name,
-                        desc: baseCard.desc,
-                        pattern: baseCard.pattern,
-                        target: baseCard.target,
-                        effect: baseCard.effect,
-                      } as Card;
-                    }),
-                    avatar: ["🔵", "🟣", "🟡", "🟢"][i] || "🔵",
-                    name: `Player ${i + 1}`,
-                  }));
-                  setPlayers(defaultPlayers);
-                  setTurn(0);
-                }
-
-                // 🔧 关键：使用API返回的服务器生成的boardTiles，确保两个客户端棋盘一致
-                console.log("🎲 使用服务器返回的棋盘瓷砖");
-                setBoardTiles(serverBoardTiles);
-                setEventCounts({});
-
-                setPhase("playing");
+                // 通过 WS 通知服务端开始游戏；服务端会广播 room_update / players_update / game_update
+                // useEffect (room?.state) 收到广播后自动初始化游戏状态，无需在此处理
+                await startMultiplayerGame();
               } catch (error) {
                 console.error("Failed to start game:", error);
               }
@@ -2524,61 +1732,21 @@ export default function App() {
               }>,
             ) => {
               if (!isMultiplayer || !roomId) return;
-
-              // ============================================================
-              // Ably WebSocket 模式
-              // ============================================================
-              if (useAbly && partyRoom.isConnected && currentPlayerIndex !== null) {
-                console.log("⚡ Ably 模式：发送 event_confirm");
-                // 通过 WebSocket 通知服务器确认事件
-                // 服务器会应用事件效果并广播 event_applied (包含 turn_ended)
-                partyRoom.confirmEvent(currentPlayerIndex);
-                return;
-              }
-
-              // ============================================================
-              // Supabase API 回退模式
-              // ============================================================
-              const token =
-                (await supabase.auth.getSession())?.data.session
-                  ?.access_token || "";
-              // 批量同步受影响玩家位置
+              // 批量同步受影响玩家位置（通过 WS）
               for (const upd of updatedPositions) {
                 if (upd.position !== undefined || upd.skipTurn !== undefined) {
-                  await fetch("/api/rooms", {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                      Authorization: `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({
-                      action: "movePlayer",
-                      roomId,
-                      position: upd.position,
-                      lapCount: upd.lap,
-                      targetPlayerIndex: upd.playerIndex,
-                    }),
-                  }).catch(console.error);
+                  await roomMovePlayer(
+                    upd.position ?? players[upd.playerIndex]?.pos ?? 0,
+                    upd.lap ?? players[upd.playerIndex]?.lap ?? 0,
+                    upd.playerIndex,
+                  ).catch(console.error);
                 }
               }
               // 清除事件并推进回合
               try {
-                const endRes = await fetch("/api/rooms", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                  },
-                  body: JSON.stringify({ action: "endPlayerTurn", roomId }),
-                });
-                if (endRes.ok) {
-                  const data = await endRes.json();
-                  setTurn(data.turn);
-                  setHasUsedCard(false);
-                } else {
-                  setTurn((turn + 1) % numPlayers);
-                  setHasUsedCard(false);
-                }
+                const data = await endPlayerTurn();
+                setTurn(data.turn);
+                setHasUsedCard(false);
               } catch {
                 setTurn((turn + 1) % numPlayers);
                 setHasUsedCard(false);

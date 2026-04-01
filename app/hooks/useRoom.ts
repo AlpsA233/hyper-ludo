@@ -3,21 +3,35 @@ import { supabase } from "../lib/supabase";
 import type { Player } from "../types";
 
 // 调用本地的 API Routes
-async function callRoomService(action: string, data: any) {
+async function callRoomService(
+  action: string,
+  data: any,
+  devUserId?: string | null,
+) {
+  const isDevMode = process.env.NEXT_PUBLIC_DEV_SKIP_AUTH === "true";
+
   const {
     data: { session },
   } = await supabase.auth.getSession();
 
-  if (!session) {
+  if (!session && !isDevMode) {
     throw new Error("User not authenticated");
+  }
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (session) {
+    headers["Authorization"] = `Bearer ${session.access_token}`;
+  } else if (isDevMode && devUserId) {
+    // 开发模式：使用 dev user id 代替 auth token
+    headers["X-Dev-User-Id"] = devUserId;
   }
 
   const response = await fetch("/api/rooms", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${session.access_token}`,
-    },
+    headers,
     body: JSON.stringify({ action, ...data }),
   });
 
@@ -138,6 +152,7 @@ export function useRoom(userId: string | null): UseRoomReturn {
           config,
           playerName,
         },
+        userId,
       );
 
       setRoom(newRoom);
@@ -172,6 +187,7 @@ export function useRoom(userId: string | null): UseRoomReturn {
           roomCode,
           playerName,
         },
+        userId,
       );
 
       setRoom(targetRoom);
@@ -193,9 +209,13 @@ export function useRoom(userId: string | null): UseRoomReturn {
 
     try {
       // 调用服务端 API
-      await callRoomService("leaveRoom", {
-        roomId: room.id,
-      });
+      await callRoomService(
+        "leaveRoom",
+        {
+          roomId: room.id,
+        },
+        userId,
+      );
 
       setRoom(null);
       setPlayers([]);
@@ -211,9 +231,13 @@ export function useRoom(userId: string | null): UseRoomReturn {
 
     try {
       const { room: updatedRoom, players: updatedPlayers } =
-        await callRoomService("startGame", {
-          roomId: room.id,
-        });
+        await callRoomService(
+          "startGame",
+          {
+            roomId: room.id,
+          },
+          userId,
+        );
 
       setRoom(updatedRoom);
       setPlayers(updatedPlayers);
@@ -230,10 +254,14 @@ export function useRoom(userId: string | null): UseRoomReturn {
     }
 
     try {
-      const result = await callRoomService("rollDice", {
-        roomId: room.id,
-        diceCount,
-      });
+      const result = await callRoomService(
+        "rollDice",
+        {
+          roomId: room.id,
+          diceCount,
+        },
+        userId,
+      );
 
       return result;
     } catch (err: any) {
@@ -272,11 +300,15 @@ export function useRoom(userId: string | null): UseRoomReturn {
     }
 
     try {
-      const result = await callRoomService("movePlayer", {
-        roomId: room.id,
-        position,
-        lapCount,
-      });
+      const result = await callRoomService(
+        "movePlayer",
+        {
+          roomId: room.id,
+          position,
+          lapCount,
+        },
+        userId,
+      );
 
       // 更新本地玩家列表
       if (result.players) {
@@ -297,10 +329,14 @@ export function useRoom(userId: string | null): UseRoomReturn {
     }
 
     try {
-      const result = await callRoomService("triggerEvent", {
-        roomId: room.id,
-        event,
-      });
+      const result = await callRoomService(
+        "triggerEvent",
+        {
+          roomId: room.id,
+          event,
+        },
+        userId,
+      );
 
       return result;
     } catch (err: any) {
@@ -316,9 +352,13 @@ export function useRoom(userId: string | null): UseRoomReturn {
     }
 
     try {
-      const result = await callRoomService("endPlayerTurn", {
-        roomId: room.id,
-      });
+      const result = await callRoomService(
+        "endPlayerTurn",
+        {
+          roomId: room.id,
+        },
+        userId,
+      );
 
       return result;
     } catch (err: any) {
@@ -340,10 +380,14 @@ export function useRoom(userId: string | null): UseRoomReturn {
     }
 
     try {
-      const result = await callRoomService("updateRoomConfig", {
-        roomId: room.id,
-        config,
-      });
+      const result = await callRoomService(
+        "updateRoomConfig",
+        {
+          roomId: room.id,
+          config,
+        },
+        userId,
+      );
 
       // 更新本地房间状态
       setRoom(result);
@@ -356,29 +400,33 @@ export function useRoom(userId: string | null): UseRoomReturn {
   };
 
   // 加载房间数据（通过服务端 API）
-  const loadRoom = useCallback(async (roomId: string): Promise<void> => {
-    setLoading(true);
-    setError(null);
+  const loadRoom = useCallback(
+    async (roomId: string): Promise<void> => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      // 调用服务端 API，获取完整的房间和玩家数据
-      const { room: roomData, players: playersData } = await callRoomService(
-        "getRoomInfo",
-        {
-          roomId,
-        },
-      );
+      try {
+        // 调用服务端 API，获取完整的房间和玩家数据
+        const { room: roomData, players: playersData } = await callRoomService(
+          "getRoomInfo",
+          {
+            roomId,
+          },
+          userId,
+        );
 
-      setRoom(roomData);
-      setPlayers(playersData);
-    } catch (err: any) {
-      const msg = err.message || "Failed to load room";
-      setError(msg);
-      console.error("Room load error:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+        setRoom(roomData);
+        setPlayers(playersData);
+      } catch (err: any) {
+        const msg = err.message || "Failed to load room";
+        setError(msg);
+        console.error("Room load error:", err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [userId],
+  );
 
   // 订阅房间实时更新
   const subscribe = useCallback((roomId: string): (() => void) => {
