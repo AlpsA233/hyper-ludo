@@ -1,18 +1,38 @@
 /**
- * Redis-backed game state store (Upstash via @vercel/kv).
- * Shared across all Vercel serverless function invocations.
+ * Hybrid game state store:
+ *   - Local dev (no KV_REST_API_URL): in-memory Maps (fast, zero network)
+ *   - Production (Vercel): Upstash Redis via @vercel/kv (shared across instances)
  *
- * Keys:
- *   room:{id}           → RoomInfo (TTL 24h)
- *   code:{code}         → roomId   (TTL 24h)
- *   players:{roomId}    → RoomPlayer[] (TTL 24h)
- *   game:{roomId}       → GameState (TTL 24h)
+ * Redis keys (TTL 24h):
+ *   room:{id}        → RoomInfo
+ *   code:{code}      → roomId
+ *   players:{roomId} → RoomPlayer[]
+ *   game:{roomId}    → GameState
  */
 
-import { kv } from "@vercel/kv";
 import { randomUUID } from "crypto";
 
 const TTL = 60 * 60 * 24; // 24 hours
+
+// ── Detect environment ────────────────────────────────────────────
+const USE_REDIS = !!(
+  process.env.KV_REST_API_URL &&
+  process.env.KV_REST_API_TOKEN &&
+  process.env.KV_REST_API_URL !== "" &&
+  !process.env.KV_REST_API_URL.includes("localhost")
+);
+
+// ── In-memory fallback (local dev) ────────────────────────────────
+const memRooms = new Map<string, RoomInfo>();
+const memCodes = new Map<string, string>();
+const memPlayers = new Map<string, RoomPlayer[]>();
+const memGames = new Map<string, GameState>();
+
+// ── Lazy Redis import (only when needed) ──────────────────────────
+async function getKv() {
+  const { kv } = await import("@vercel/kv");
+  return kv;
+}
 
 export interface RoomInfo {
   id: string;
@@ -58,46 +78,55 @@ export interface GameState {
 
 // ── Room ──────────────────────────────────────────────────────────
 export async function getRoom(roomId: string): Promise<RoomInfo | null> {
-  return kv.get<RoomInfo>(`room:${roomId}`);
+  if (!USE_REDIS) return memRooms.get(roomId) ?? null;
+  return (await getKv()).get<RoomInfo>(`room:${roomId}`);
 }
 export async function setRoom(room: RoomInfo): Promise<void> {
-  await kv.set(`room:${room.id}`, room, { ex: TTL });
+  if (!USE_REDIS) { memRooms.set(room.id, room); return; }
+  await (await getKv()).set(`room:${room.id}`, room, { ex: TTL });
 }
 export async function deleteRoom(room: RoomInfo): Promise<void> {
-  await Promise.all([
-    kv.del(`room:${room.id}`),
-    kv.del(`code:${room.room_code}`),
-  ]);
+  if (!USE_REDIS) { memRooms.delete(room.id); memCodes.delete(room.room_code); return; }
+  const kv = await getKv();
+  await Promise.all([kv.del(`room:${room.id}`), kv.del(`code:${room.room_code}`)]);
 }
 
 // ── Room code lookup ──────────────────────────────────────────────
 export async function getRoomIdByCode(code: string): Promise<string | null> {
-  return kv.get<string>(`code:${code}`);
+  if (!USE_REDIS) return memCodes.get(code) ?? null;
+  return (await getKv()).get<string>(`code:${code}`);
 }
 export async function setRoomCode(code: string, roomId: string): Promise<void> {
-  await kv.set(`code:${code}`, roomId, { ex: TTL });
+  if (!USE_REDIS) { memCodes.set(code, roomId); return; }
+  await (await getKv()).set(`code:${code}`, roomId, { ex: TTL });
 }
 
 // ── Players ───────────────────────────────────────────────────────
 export async function getPlayers(roomId: string): Promise<RoomPlayer[]> {
-  return (await kv.get<RoomPlayer[]>(`players:${roomId}`)) ?? [];
+  if (!USE_REDIS) return memPlayers.get(roomId) ?? [];
+  return (await (await getKv()).get<RoomPlayer[]>(`players:${roomId}`)) ?? [];
 }
 export async function setPlayers(roomId: string, players: RoomPlayer[]): Promise<void> {
-  await kv.set(`players:${roomId}`, players, { ex: TTL });
+  if (!USE_REDIS) { memPlayers.set(roomId, players); return; }
+  await (await getKv()).set(`players:${roomId}`, players, { ex: TTL });
 }
 export async function deletePlayers(roomId: string): Promise<void> {
-  await kv.del(`players:${roomId}`);
+  if (!USE_REDIS) { memPlayers.delete(roomId); return; }
+  await (await getKv()).del(`players:${roomId}`);
 }
 
 // ── Game state ────────────────────────────────────────────────────
 export async function getGameState(roomId: string): Promise<GameState | null> {
-  return kv.get<GameState>(`game:${roomId}`);
+  if (!USE_REDIS) return memGames.get(roomId) ?? null;
+  return (await getKv()).get<GameState>(`game:${roomId}`);
 }
 export async function setGameState(roomId: string, state: GameState): Promise<void> {
-  await kv.set(`game:${roomId}`, state, { ex: TTL });
+  if (!USE_REDIS) { memGames.set(roomId, state); return; }
+  await (await getKv()).set(`game:${roomId}`, state, { ex: TTL });
 }
 export async function deleteGameState(roomId: string): Promise<void> {
-  await kv.del(`game:${roomId}`);
+  if (!USE_REDIS) { memGames.delete(roomId); return; }
+  await (await getKv()).del(`game:${roomId}`);
 }
 
 // ── Utilities ─────────────────────────────────────────────────────
