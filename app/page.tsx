@@ -521,19 +521,25 @@ export default function App() {
     }
 
     // 胜利同步：非操作玩家收到胜利通知
-    if (
-      gameState.phase === "win" &&
-      gameState.active_card?.winnerIndex !== undefined
-    ) {
-      const wIdx = gameState.active_card.winnerIndex;
+    if (gameState.phase === "win" && phase !== "win") {
+      // 根据 lap >= lapsToWin 推断完赛情况，并按 lap 降序分配排名
       setPlayers((prev) => {
-        const winner = prev[wIdx];
-        if (winner) {
-          setWinner(winner);
-          setPhase("win");
-        }
-        return prev;
+        const sorted = [...prev]
+          .map((p, i) => ({ p, i }))
+          .sort((a, b) => b.p.lap - a.p.lap);
+        let rank = 1;
+        const next = [...prev];
+        sorted.forEach(({ p, i }) => {
+          if (p.lap >= lapsToWin) {
+            next[i] = { ...p, finished: true, finishRank: rank++ };
+          }
+        });
+        // 最后未完赛者补末位
+        const lastIdx = next.findIndex((p) => !p.finished);
+        if (lastIdx !== -1) next[lastIdx] = { ...next[lastIdx], finishRank: next.length };
+        return next;
       });
+      setPhase("win");
     }
   }, [gameState, isMultiplayer, isMoving, isRolling]);
 
@@ -804,16 +810,18 @@ export default function App() {
 
       // 🔧 检查玩家是否被跳过（因为卡牌或事件效果）
       const currentPlayer = players[turn];
-      if (currentPlayer && currentPlayer.skipTurn) {
-        addLog(`⏭️  玩家 ${turn + 1} 被跳过`);
-        setPlayers((prev) =>
-          prev.map((p, i) => (i === turn ? { ...p, skipTurn: false } : p)),
-        );
-        // 清除暂停结束玩家的emoji，并在1秒后消失
-        const newCardEffectDisplay = { ...cardEffectDisplay };
-        if (newCardEffectDisplay[turn]) {
-          newCardEffectDisplay[turn].hideTime = Date.now() + 1000;
-          setCardEffectDisplay(newCardEffectDisplay);
+      if (currentPlayer && (currentPlayer.skipTurn || currentPlayer.finished)) {
+        if (currentPlayer.skipTurn) {
+          addLog(`⏭️  玩家 ${turn + 1} 被跳过`);
+          setPlayers((prev) =>
+            prev.map((p, i) => (i === turn ? { ...p, skipTurn: false } : p)),
+          );
+          // 清除暂停结束玩家的emoji，并在1秒后消失
+          const newCardEffectDisplay = { ...cardEffectDisplay };
+          if (newCardEffectDisplay[turn]) {
+            newCardEffectDisplay[turn].hideTime = Date.now() + 1000;
+            setCardEffectDisplay(newCardEffectDisplay);
+          }
         }
         setTurn((turn + 1) % numPlayers);
         setHasUsedCard(false);
@@ -988,32 +996,46 @@ export default function App() {
     };
 
     animatePieceMove(turn, () => {
-      let hasWon = false;
+      let gameOver = false;
+      let updatedPlayers: Player[] = [];
       setPlayers((prev) => {
         const next = [...prev];
-        const curr = {
-          ...next[turn],
-          pos: finalPos,
-          lap: newLap,
-        };
-        if (curr.lap >= lapsToWin) {
-          hasWon = true;
-          setWinner(curr);
-          setPhase("win");
-          return next;
+        const curr = { ...next[turn], pos: finalPos, lap: newLap };
+
+        if (curr.lap >= lapsToWin && !curr.finished) {
+          // 计算完赛排名：已完赛人数 + 1
+          const finishedCount = next.filter((p) => p.finished).length;
+          curr.finished = true;
+          curr.finishRank = finishedCount + 1;
+          next[turn] = curr;
+
+          // 检查是否只剩 1 人未完赛（游戏结束条件）
+          const unfinished = next.filter((p) => !p.finished);
+          if (unfinished.length <= 1) {
+            // 给最后一人补上末位排名
+            if (unfinished.length === 1) {
+              const lastIdx = next.findIndex((p) => !p.finished);
+              next[lastIdx] = { ...next[lastIdx], finishRank: next.length };
+            }
+            gameOver = true;
+            setPhase("win");
+          }
+        } else {
+          next[turn] = curr;
         }
-        // 碰撞检测已移除 - 玩家可以共享相同位置
-        next[turn] = curr;
+
+        updatedPlayers = next;
         return next;
       });
       addLog(`Player ${turn + 1} moved to pos ${finalPos} (lap ${newLap})`);
-      // 同步位置到服务器（包含胜利状态）
-      if (hasWon && isMultiplayer && roomId) {
+      // 同步位置到服务器
+      if (gameOver && isMultiplayer && roomId) {
         roomMovePlayer(finalPos, newLap).catch(console.error);
         roomSetWinner(turn).catch(console.error);
       } else {
         syncPositionToServer();
       }
+      if (gameOver) return;
       // 事件触发: 只在CUSTOM格子上触发
       const isCustomTile =
         finalPos !== -1 && boardTiles[finalPos]?.id === "CUSTOM";
@@ -1847,8 +1869,7 @@ export default function App() {
         )}
 
         <WinScreen
-          winner={winner}
-          winnerIndex={winner ? winner.id : 0}
+          players={phase === "win" ? players : []}
           setPhase={(phase) => {
             setEventCounts({});
             setPhase(phase);

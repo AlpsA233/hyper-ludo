@@ -74,7 +74,7 @@ export default function PlayerSidebar({
     return (
       <div className="w-64 flex-shrink-0 flex flex-col gap-4 pt-4 px-2 max-h-[calc(100vh-120px)] overflow-y-auto">
         {displayPlayers.map(({ player: p, index: i }) => {
-          const progress = calculateProgress(p, i);
+          const progress = p.finished ? 100 : calculateProgress(p, i);
           const rank = getRank(i);
 
           return (
@@ -83,6 +83,7 @@ export default function PlayerSidebar({
               className="relative bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 transition-all duration-300 hover:bg-white/15 mt-2"
               style={{
                 boxShadow: i === turn ? `0 0 20px ${COLORS[i].hex}` : "none",
+                opacity: p.finished ? 0.75 : 1,
               }}>
               {/* Turn Indicator */}
               {i === turn && (
@@ -104,8 +105,11 @@ export default function PlayerSidebar({
                       : "rgba(255,255,255,0.2)",
                   border: "2px solid white",
                 }}>
-                {getRankingBadge(rank)}
+                {p.finished ? (["🥇","🥈","🥉"][(p.finishRank ?? 1) - 1] ?? `${p.finishRank}`) : getRankingBadge(rank)}
               </div>
+              {p.finished && (
+                <div className="absolute top-1 left-2 text-xs text-yellow-300 font-bold">✓完赛</div>
+              )}
 
               <div className="flex items-center gap-3 mb-3">
                 <div className="relative">

@@ -66,6 +66,8 @@ export interface Player {
   startPos: number; // 记录玩家的起始位置，用于正确计算圈数
   shield: boolean;
   skipTurn: boolean;
+  finished?: boolean; // 已完赛（到达目标圈数），仍留在棋盘但跳过其回合
+  finishRank?: number; // 完赛排名（1=第一名，2=第二名…）
   cards: Card[];
   avatar?: string; // 玩家头像（emoji或图片URL）
   name?: string; // 玩家名称
