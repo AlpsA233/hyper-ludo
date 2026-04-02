@@ -74,6 +74,8 @@ export interface GameState {
   active_card: any | null;
   logs: string[];
   board_tiles: Array<{ id: string }>;
+  card_database: any[];
+  event_database: any[];
 }
 
 // ── Room ──────────────────────────────────────────────────────────

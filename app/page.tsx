@@ -423,10 +423,11 @@ export default function App() {
         skipTurn: false,
         cards: Array.from({ length: room.initial_cards || initialCards }).map(
           () => {
+            const cardDb = gameState.card_database?.length
+              ? gameState.card_database
+              : userData.cardDatabase;
             const baseCard =
-              userData.cardDatabase[
-                Math.floor(Math.random() * userData.cardDatabase.length)
-              ];
+              cardDb[Math.floor(Math.random() * cardDb.length)];
             return {
               id: baseCard.id,
               rarity: baseCard.rarity as "NR" | "R" | "SR" | "SSR",
@@ -1025,7 +1026,11 @@ export default function App() {
           const currentProgress = (newLap / totalLaps) * 100;
 
           // 筛选当前进度允许的事件
-          let allowedEvents = userData.eventDatabase.filter((evt) => {
+          const eventDb =
+            isMultiplayer && gameState?.event_database?.length
+              ? gameState.event_database
+              : userData.eventDatabase;
+          let allowedEvents = eventDb.filter((evt: any) => {
             // 如果progressRange未定义，表示全程都允许
             if (!evt.progressRange) return true;
             // 否则检查当前进度是否在范围内
@@ -1036,7 +1041,7 @@ export default function App() {
           });
 
           // 进一步过滤：检查 limitPerPlayer 限制
-          allowedEvents = allowedEvents.filter((evt) => {
+          allowedEvents = allowedEvents.filter((evt: any) => {
             // 如果没有设置限制，或限制为 undefined，则允许
             if (evt.limitPerPlayer === undefined) return true;
             // 获取当前玩家已触发该事件的次数
@@ -1374,7 +1379,10 @@ export default function App() {
               try {
                 // 通过 WS 通知服务端开始游戏；服务端会广播 room_update / players_update / game_update
                 // useEffect (room?.state) 收到广播后自动初始化游戏状态，无需在此处理
-                await startMultiplayerGame();
+                await startMultiplayerGame({
+                  cardDatabase: userData.cardDatabase,
+                  eventDatabase: userData.eventDatabase,
+                });
               } catch (error) {
                 console.error("Failed to start game:", error);
               }

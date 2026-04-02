@@ -61,7 +61,7 @@ interface UseRoomReturn {
     avatar: string,
   ) => Promise<string>;
   leaveRoom: () => Promise<void>;
-  startGame: () => Promise<void>;
+  startGame: (config?: { cardDatabase?: any[]; eventDatabase?: any[] }) => Promise<void>;
   rollDice: (diceCount: number) => Promise<any>;
   movePlayer: (
     position: number,
@@ -241,10 +241,10 @@ export function useRoom(userId: string | null): UseRoomReturn {
     }
   };
 
-  const startGame = async (): Promise<void> => {
+  const startGame = async (config?: { cardDatabase?: any[]; eventDatabase?: any[] }): Promise<void> => {
     if (!room || !userId) return;
     try {
-      const result = await gameAction("startGame", userId, room.id);
+      const result = await gameAction("startGame", userId, room.id, config || {});
       setRoom(result.room);
       setPlayers(result.players);
     } catch (err: any) {

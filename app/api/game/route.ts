@@ -249,6 +249,7 @@ export async function POST(request: Request) {
           });
         }
 
+        const { cardDatabase = [], eventDatabase = [] } = payload || {};
         const totalSteps = 40;
         const eventDensity = room.event_density || 40;
         const boardTiles = Array.from({ length: totalSteps }).map((_, i) => {
@@ -268,6 +269,8 @@ export async function POST(request: Request) {
           active_card: null,
           logs: [],
           board_tiles: boardTiles,
+          card_database: cardDatabase,
+          event_database: eventDatabase,
         };
 
         room.state = "playing";
