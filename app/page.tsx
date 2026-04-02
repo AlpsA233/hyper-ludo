@@ -1848,7 +1848,7 @@ export default function App() {
 
         <WinScreen
           winner={winner}
-          winnerIndex={players.findIndex((p) => p === winner)}
+          winnerIndex={winner ? winner.id : 0}
           setPhase={(phase) => {
             setEventCounts({});
             setPhase(phase);
