@@ -1623,6 +1623,7 @@ export default function App() {
             // 多人游戏：非回合玩家直接关闭本地弹窗，等待回合玩家处理后服务端广播结果
             if (isMultiplayer && currentPlayerIndex !== turn) {
               setActiveEvent(null);
+              setPhase("playing");
               return;
             }
 
