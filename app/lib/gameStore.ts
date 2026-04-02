@@ -1,12 +1,18 @@
 /**
- * In-memory game state store.
- * Works as a Node.js module singleton in Next.js dev server (single process).
+ * Redis-backed game state store (Upstash via @vercel/kv).
+ * Shared across all Vercel serverless function invocations.
  *
- * NOTE: For Vercel production (serverless), this memory is NOT shared across
- * function invocations. Add Upstash Redis or similar to persist state in prod.
+ * Keys:
+ *   room:{id}           → RoomInfo (TTL 24h)
+ *   code:{code}         → roomId   (TTL 24h)
+ *   players:{roomId}    → RoomPlayer[] (TTL 24h)
+ *   game:{roomId}       → GameState (TTL 24h)
  */
 
+import { kv } from "@vercel/kv";
 import { randomUUID } from "crypto";
+
+const TTL = 60 * 60 * 24; // 24 hours
 
 export interface RoomInfo {
   id: string;
@@ -50,11 +56,51 @@ export interface GameState {
   board_tiles: Array<{ id: string }>;
 }
 
-// Module-level singletons
-export const rooms = new Map<string, RoomInfo>();
-export const roomPlayers = new Map<string, RoomPlayer[]>();
-export const roomGames = new Map<string, GameState>();
+// ── Room ──────────────────────────────────────────────────────────
+export async function getRoom(roomId: string): Promise<RoomInfo | null> {
+  return kv.get<RoomInfo>(`room:${roomId}`);
+}
+export async function setRoom(room: RoomInfo): Promise<void> {
+  await kv.set(`room:${room.id}`, room, { ex: TTL });
+}
+export async function deleteRoom(room: RoomInfo): Promise<void> {
+  await Promise.all([
+    kv.del(`room:${room.id}`),
+    kv.del(`code:${room.room_code}`),
+  ]);
+}
 
+// ── Room code lookup ──────────────────────────────────────────────
+export async function getRoomIdByCode(code: string): Promise<string | null> {
+  return kv.get<string>(`code:${code}`);
+}
+export async function setRoomCode(code: string, roomId: string): Promise<void> {
+  await kv.set(`code:${code}`, roomId, { ex: TTL });
+}
+
+// ── Players ───────────────────────────────────────────────────────
+export async function getPlayers(roomId: string): Promise<RoomPlayer[]> {
+  return (await kv.get<RoomPlayer[]>(`players:${roomId}`)) ?? [];
+}
+export async function setPlayers(roomId: string, players: RoomPlayer[]): Promise<void> {
+  await kv.set(`players:${roomId}`, players, { ex: TTL });
+}
+export async function deletePlayers(roomId: string): Promise<void> {
+  await kv.del(`players:${roomId}`);
+}
+
+// ── Game state ────────────────────────────────────────────────────
+export async function getGameState(roomId: string): Promise<GameState | null> {
+  return kv.get<GameState>(`game:${roomId}`);
+}
+export async function setGameState(roomId: string, state: GameState): Promise<void> {
+  await kv.set(`game:${roomId}`, state, { ex: TTL });
+}
+export async function deleteGameState(roomId: string): Promise<void> {
+  await kv.del(`game:${roomId}`);
+}
+
+// ── Utilities ─────────────────────────────────────────────────────
 export function generateRoomCode(): string {
   const chars = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
   const nums = "23456789";
