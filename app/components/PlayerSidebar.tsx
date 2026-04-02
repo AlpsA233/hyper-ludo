@@ -28,7 +28,7 @@ export default function PlayerSidebar({
   };
 
   const calculateProgress = (p: Player, i: number) => {
-    const startIndex = i * (totalSteps / players.length);
+    const startIndex = p.startPos;
     const relativePos =
       p.pos !== -1 ? (p.pos - startIndex + totalSteps) % totalSteps : 0;
     const totalProgress = p.lap * totalSteps + relativePos;
@@ -41,17 +41,15 @@ export default function PlayerSidebar({
     ? [...players]
         .map((p, i) => ({ player: p, index: i }))
         .sort((a, b) => {
-          const startIndexA = a.index * (totalSteps / players.length);
           const relPosA =
             a.player.pos !== -1
-              ? (a.player.pos - startIndexA + totalSteps) % totalSteps
+              ? (a.player.pos - a.player.startPos + totalSteps) % totalSteps
               : 0;
           const progressA = a.player.lap * totalSteps + relPosA;
 
-          const startIndexB = b.index * (totalSteps / players.length);
           const relPosB =
             b.player.pos !== -1
-              ? (b.player.pos - startIndexB + totalSteps) % totalSteps
+              ? (b.player.pos - b.player.startPos + totalSteps) % totalSteps
               : 0;
           const progressB = b.player.lap * totalSteps + relPosB;
 
@@ -62,9 +60,8 @@ export default function PlayerSidebar({
   // 计算排名
   const rankings = [...players]
     .map((p, i) => {
-      const startIndex = i * (totalSteps / players.length);
       const relPos =
-        p.pos !== -1 ? (p.pos - startIndex + totalSteps) % totalSteps : 0;
+        p.pos !== -1 ? (p.pos - p.startPos + totalSteps) % totalSteps : 0;
       return { index: i, progress: p.lap * totalSteps + relPos };
     })
     .sort((a, b) => b.progress - a.progress);
