@@ -131,7 +131,9 @@ function handleJoinRoom(ws, userId, { roomCode, playerName = "Player" }) {
   const existingPlayer = players.find((p) => p.user_id === userId);
   if (existingPlayer) {
     addClientToRoom(ws, targetRoom.id);
-    console.log(`🔄 ${playerName} re-joined room ${roomCode} (already a member)`);
+    console.log(
+      `🔄 ${playerName} re-joined room ${roomCode} (already a member)`,
+    );
     return { room: targetRoom, players };
   }
 

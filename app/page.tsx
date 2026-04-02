@@ -8,7 +8,7 @@ import { useLanguage } from "@/app/hooks/useLanguage";
 import { useDeviceShake } from "@/app/hooks/useDeviceShake";
 import { useAuth } from "@/app/hooks/useAuth";
 import { useUserData } from "@/app/hooks/useUserData";
-import { useRoom } from "@/app/hooks/useRoomWs";
+import { useRoom } from "@/app/hooks/useRoomAbly";
 import { supabase } from "@/app/lib/supabase";
 import {
   Dice1,
@@ -127,7 +127,10 @@ export default function App() {
   // 开发/游客模式下，每个浏览器会话生成唯一 userId（持久化到 localStorage）
   const [guestUserId] = useState<string>(() => {
     const genUUID = () => {
-      if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      if (
+        typeof crypto !== "undefined" &&
+        typeof crypto.randomUUID === "function"
+      ) {
         return crypto.randomUUID();
       }
       // HTTP 下 crypto.randomUUID 不可用，手动生成
@@ -418,21 +421,23 @@ export default function App() {
         startPos: 0,
         shield: false,
         skipTurn: false,
-        cards: Array.from({ length: room.initial_cards || initialCards }).map(() => {
-          const baseCard =
-            userData.cardDatabase[
-              Math.floor(Math.random() * userData.cardDatabase.length)
-            ];
-          return {
-            id: baseCard.id,
-            rarity: baseCard.rarity as "NR" | "R" | "SR" | "SSR",
-            name: baseCard.name,
-            desc: baseCard.desc,
-            pattern: baseCard.pattern,
-            target: baseCard.target,
-            effect: baseCard.effect,
-          } as Card;
-        }),
+        cards: Array.from({ length: room.initial_cards || initialCards }).map(
+          () => {
+            const baseCard =
+              userData.cardDatabase[
+                Math.floor(Math.random() * userData.cardDatabase.length)
+              ];
+            return {
+              id: baseCard.id,
+              rarity: baseCard.rarity as "NR" | "R" | "SR" | "SSR",
+              name: baseCard.name,
+              desc: baseCard.desc,
+              pattern: baseCard.pattern,
+              target: baseCard.target,
+              effect: baseCard.effect,
+            } as Card;
+          },
+        ),
         avatar: rp.avatar || ["🔵", "🟣", "🟡", "🟢"][rp.player_index % 4],
         name: rp.player_name || `Player ${rp.player_index + 1}`,
       }));
@@ -446,7 +451,15 @@ export default function App() {
 
     // 切换到游戏阶段
     setPhase("playing");
-  }, [room?.state, roomId, phase, roomPlayers, gameState, userData, initialCards]);
+  }, [
+    room?.state,
+    roomId,
+    phase,
+    roomPlayers,
+    gameState,
+    userData,
+    initialCards,
+  ]);
 
   // 多人游戏：当 gameState 变化时，同步本地状态
   useEffect(() => {

@@ -1,11 +1,11 @@
 /**
- * WebSocket-based room hook.
- * Drop-in replacement for useRoom — same interface, no Supabase dependency.
- * All communication goes through the standalone WS server (server/ws-server.mjs).
+ * Ably-based room hook — drop-in replacement for useRoomWs.
+ * Actions go via HTTP POST to /api/game.
+ * Real-time state updates come via Ably channel subscription.
  */
 
-import { useEffect, useState, useCallback } from "react";
-import { wsClient } from "../lib/wsClient";
+import { useEffect, useState, useCallback, useRef } from "react";
+import Ably from "ably";
 
 export interface RoomInfo {
   id: string;
@@ -17,6 +17,7 @@ export interface RoomInfo {
   laps_to_win: number;
   initial_cards: number;
   event_density: number;
+  current_players: number;
   created_at: string;
   updated_at: string;
 }
@@ -82,33 +83,79 @@ interface UseRoomReturn {
   subscribe: (roomId: string) => () => void;
 }
 
+// ── Ably singleton ─────────────────────────────────────────────────────────
+let ablyInstance: Ably.Realtime | null = null;
+
+function getAbly(clientId: string): Ably.Realtime {
+  if (!ablyInstance) {
+    ablyInstance = new Ably.Realtime({
+      authUrl: `/api/ably-token?clientId=${encodeURIComponent(clientId)}`,
+      clientId,
+      autoConnect: true,
+    });
+  }
+  return ablyInstance;
+}
+
+// ── HTTP helper ────────────────────────────────────────────────────────────
+async function gameAction(
+  action: string,
+  userId: string,
+  roomId?: string | null,
+  payload?: any,
+): Promise<any> {
+  const res = await fetch("/api/game", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, userId, roomId, payload }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+// ── Hook ───────────────────────────────────────────────────────────────────
 export function useRoom(userId: string | null): UseRoomReturn {
   const [room, setRoom] = useState<RoomInfo | null>(null);
   const [players, setPlayers] = useState<RoomPlayer[]>([]);
   const [gameState, setGameState] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const channelRef = useRef<Ably.RealtimeChannel | null>(null);
+  const roomIdRef = useRef<string | null>(null);
 
-  // Connect and listen for broadcasts
+  const isCreator = !!(userId && room?.creator_id === userId);
+
+  // Subscribe to Ably channel whenever room.id changes
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !room?.id) return;
+    if (roomIdRef.current === room.id) return; // already subscribed
 
-    wsClient.connect(userId);
+    // Unsubscribe from old channel
+    if (channelRef.current) {
+      channelRef.current.unsubscribe();
+      channelRef.current = null;
+    }
 
-    const onRoomUpdate = (data: any) => setRoom(data);
-    const onPlayersUpdate = (data: any) => setPlayers(data);
-    const onGameUpdate = (data: any) => setGameState(data);
+    const ably = getAbly(userId);
+    const channel = ably.channels.get(`game:${room.id}`);
+    channelRef.current = channel;
+    roomIdRef.current = room.id;
 
-    wsClient.on("room_update", onRoomUpdate);
-    wsClient.on("players_update", onPlayersUpdate);
-    wsClient.on("game_update", onGameUpdate);
+    channel.subscribe("room_update", (msg) => setRoom(msg.data));
+    channel.subscribe("players_update", (msg) => setPlayers(msg.data));
+    channel.subscribe("game_update", (msg) => setGameState(msg.data));
 
     return () => {
-      wsClient.off("room_update", onRoomUpdate);
-      wsClient.off("players_update", onPlayersUpdate);
-      wsClient.off("game_update", onGameUpdate);
+      channel.unsubscribe();
+      channelRef.current = null;
+      roomIdRef.current = null;
     };
-  }, [userId]);
+  }, [userId, room?.id]);
+
+  // ── Actions ──────────────────────────────────────────────────────────────
 
   const createRoom = async (
     config: {
@@ -118,19 +165,21 @@ export function useRoom(userId: string | null): UseRoomReturn {
       initial_cards: number;
       event_density: number;
     },
-    playerName: string = "Host",
+    playerName = "Host",
   ): Promise<string> => {
-    if (!userId) throw new Error("User not logged in");
+    if (!userId) throw new Error("No user ID");
     setLoading(true);
     setError(null);
     try {
-      const result = await wsClient.send("createRoom", { config, playerName });
+      const result = await gameAction("createRoom", userId, null, {
+        config,
+        playerName,
+      });
       setRoom(result.room);
       setPlayers(result.players);
       return result.room.id;
     } catch (err: any) {
-      const msg = err.message || "Failed to create room";
-      setError(msg);
+      setError(err.message);
       throw err;
     } finally {
       setLoading(false);
@@ -142,11 +191,11 @@ export function useRoom(userId: string | null): UseRoomReturn {
     playerName: string,
     _avatar: string,
   ): Promise<string> => {
-    if (!userId) throw new Error("User not logged in");
+    if (!userId) throw new Error("No user ID");
     setLoading(true);
     setError(null);
     try {
-      const result = await wsClient.send("joinRoom", {
+      const result = await gameAction("joinRoom", userId, null, {
         roomCode,
         playerName,
       });
@@ -154,8 +203,7 @@ export function useRoom(userId: string | null): UseRoomReturn {
       setPlayers(result.players);
       return result.room.id;
     } catch (err: any) {
-      const msg = err.message || "Failed to join room";
-      setError(msg);
+      setError(err.message);
       throw err;
     } finally {
       setLoading(false);
@@ -165,7 +213,12 @@ export function useRoom(userId: string | null): UseRoomReturn {
   const leaveRoom = async (): Promise<void> => {
     if (!userId || !room) return;
     try {
-      await wsClient.send("leaveRoom", { roomId: room.id });
+      await gameAction("leaveRoom", userId, room.id);
+      if (channelRef.current) {
+        channelRef.current.unsubscribe();
+        channelRef.current = null;
+        roomIdRef.current = null;
+      }
       setRoom(null);
       setPlayers([]);
       setGameState(null);
@@ -178,7 +231,7 @@ export function useRoom(userId: string | null): UseRoomReturn {
   const startGame = async (): Promise<void> => {
     if (!room || !userId) return;
     try {
-      const result = await wsClient.send("startGame", { roomId: room.id });
+      const result = await gameAction("startGame", userId, room.id);
       setRoom(result.room);
       setPlayers(result.players);
     } catch (err: any) {
@@ -190,10 +243,7 @@ export function useRoom(userId: string | null): UseRoomReturn {
   const rollDice = async (diceCount: number): Promise<any> => {
     if (!room || !userId) throw new Error("Not in a room");
     try {
-      return await wsClient.send("rollDice", {
-        roomId: room.id,
-        diceCount,
-      });
+      return await gameAction("rollDice", userId, room.id, { diceCount });
     } catch (err: any) {
       setError(err.message);
       throw err;
@@ -207,35 +257,13 @@ export function useRoom(userId: string | null): UseRoomReturn {
   ): Promise<any> => {
     if (!room || !userId) throw new Error("Not in a room");
     try {
-      const payload: any = { roomId: room.id, position, lapCount };
-      if (targetPlayerIndex !== undefined)
-        payload.targetPlayerIndex = targetPlayerIndex;
-      const result = await wsClient.send("movePlayer", payload);
+      const result = await gameAction("movePlayer", userId, room.id, {
+        position,
+        lapCount,
+        targetPlayerIndex,
+      });
       if (result.players) setPlayers(result.players);
       return result;
-    } catch (err: any) {
-      setError(err.message);
-      throw err;
-    }
-  };
-
-  const useCard = async (cardEffect: {
-    card: any;
-    playerUpdates: any[];
-  }): Promise<any> => {
-    if (!room || !userId) throw new Error("Not in a room");
-    try {
-      return await wsClient.send("useCard", { roomId: room.id, cardEffect });
-    } catch (err: any) {
-      setError(err.message);
-      throw err;
-    }
-  };
-
-  const setWinnerWs = async (winnerIndex: number): Promise<any> => {
-    if (!room || !userId) throw new Error("Not in a room");
-    try {
-      return await wsClient.send("setWinner", { roomId: room.id, winnerIndex });
     } catch (err: any) {
       setError(err.message);
       throw err;
@@ -245,10 +273,30 @@ export function useRoom(userId: string | null): UseRoomReturn {
   const triggerEvent = async (event: any): Promise<any> => {
     if (!room || !userId) throw new Error("Not in a room");
     try {
-      return await wsClient.send("triggerEvent", {
-        roomId: room.id,
-        event,
-      });
+      return await gameAction("triggerEvent", userId, room.id, { event });
+    } catch (err: any) {
+      setError(err.message);
+      throw err;
+    }
+  };
+
+  const useCardAction = async (cardEffect: {
+    card: any;
+    playerUpdates: any[];
+  }): Promise<any> => {
+    if (!room || !userId) throw new Error("Not in a room");
+    try {
+      return await gameAction("useCard", userId, room.id, { cardEffect });
+    } catch (err: any) {
+      setError(err.message);
+      throw err;
+    }
+  };
+
+  const setWinner = async (winnerIndex: number): Promise<any> => {
+    if (!room || !userId) throw new Error("Not in a room");
+    try {
+      return await gameAction("setWinner", userId, room.id, { winnerIndex });
     } catch (err: any) {
       setError(err.message);
       throw err;
@@ -258,7 +306,7 @@ export function useRoom(userId: string | null): UseRoomReturn {
   const endPlayerTurn = async (): Promise<any> => {
     if (!room || !userId) throw new Error("Not in a room");
     try {
-      return await wsClient.send("endPlayerTurn", { roomId: room.id });
+      return await gameAction("endPlayerTurn", userId, room.id);
     } catch (err: any) {
       setError(err.message);
       throw err;
@@ -274,8 +322,7 @@ export function useRoom(userId: string | null): UseRoomReturn {
   }): Promise<any> => {
     if (!room || !userId) throw new Error("Not in a room");
     try {
-      const result = await wsClient.send("updateRoomConfig", {
-        roomId: room.id,
+      const result = await gameAction("updateRoomConfig", userId, room.id, {
         config,
       });
       setRoom(result);
@@ -287,16 +334,16 @@ export function useRoom(userId: string | null): UseRoomReturn {
   };
 
   const loadRoom = useCallback(
-    async (roomId: string): Promise<void> => {
+    async (rId: string): Promise<void> => {
       setLoading(true);
       setError(null);
       try {
-        const result = await wsClient.send("getRoomInfo", { roomId });
+        const result = await gameAction("getRoomInfo", userId!, rId);
         setRoom(result.room);
         setPlayers(result.players);
+        if (result.gameState) setGameState(result.gameState);
       } catch (err: any) {
-        const msg = err.message || "Failed to load room";
-        setError(msg);
+        setError(err.message || "Failed to load room");
         console.error("Room load error:", err);
       } finally {
         setLoading(false);
@@ -305,23 +352,24 @@ export function useRoom(userId: string | null): UseRoomReturn {
     [userId],
   );
 
-  // Subscribe to room updates via WebSocket
-  const subscribe = useCallback((roomId: string): (() => void) => {
-    // Tell the server we want updates for this room
-    wsClient.send("subscribe", { roomId }).catch(() => {});
-
-    return () => {
-      // Unsubscribe is handled by disconnect / leave
-    };
-  }, []);
-
-  const isCreator = room ? room.creator_id === userId : false;
+  const subscribe = useCallback(
+    (rId: string): (() => void) => {
+      if (!userId) return () => {};
+      const ably = getAbly(userId);
+      const channel = ably.channels.get(`game:${rId}`);
+      channel.subscribe("room_update", (msg) => setRoom(msg.data));
+      channel.subscribe("players_update", (msg) => setPlayers(msg.data));
+      channel.subscribe("game_update", (msg) => setGameState(msg.data));
+      return () => channel.unsubscribe();
+    },
+    [userId],
+  );
 
   return {
     room,
     players,
-    gameState,
     isCreator,
+    gameState,
     loading,
     error,
     createRoom,
@@ -331,8 +379,8 @@ export function useRoom(userId: string | null): UseRoomReturn {
     rollDice,
     movePlayer,
     triggerEvent,
-    useCard,
-    setWinner: setWinnerWs,
+    useCard: useCardAction,
+    setWinner,
     endPlayerTurn,
     updateRoomConfig,
     loadRoom,
