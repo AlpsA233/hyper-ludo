@@ -1,12 +1,22 @@
 import { NextResponse } from "next/server";
 import Ably from "ably";
 import {
-  getRoom, setRoom, deleteRoom,
-  getPlayers, setPlayers, deletePlayers,
-  getGameState, setGameState, deleteGameState,
-  getRoomIdByCode, setRoomCode,
-  generateRoomCode, genId,
-  RoomInfo, RoomPlayer, GameState,
+  getRoom,
+  setRoom,
+  deleteRoom,
+  getPlayers,
+  setPlayers,
+  deletePlayers,
+  getGameState,
+  setGameState,
+  deleteGameState,
+  getRoomIdByCode,
+  setRoomCode,
+  generateRoomCode,
+  genId,
+  RoomInfo,
+  RoomPlayer,
+  GameState,
 } from "@/app/lib/gameStore";
 
 const ABLY_API_KEY = process.env.ABLY_API_KEY!;
@@ -23,7 +33,10 @@ export async function POST(request: Request) {
   const { action, userId, roomId, payload = {} } = body;
 
   if (!action || !userId) {
-    return NextResponse.json({ error: "Missing action or userId" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Missing action or userId" },
+      { status: 400 },
+    );
   }
 
   try {
@@ -85,14 +98,23 @@ export async function POST(request: Request) {
 
         const targetRoomId = await getRoomIdByCode(roomCode);
         if (!targetRoomId) {
-          return NextResponse.json({ error: "Room not found" }, { status: 404 });
+          return NextResponse.json(
+            { error: "Room not found" },
+            { status: 404 },
+          );
         }
         const targetRoom = await getRoom(targetRoomId);
         if (!targetRoom) {
-          return NextResponse.json({ error: "Room not found" }, { status: 404 });
+          return NextResponse.json(
+            { error: "Room not found" },
+            { status: 404 },
+          );
         }
         if (targetRoom.state !== "waiting") {
-          return NextResponse.json({ error: "Game already started" }, { status: 400 });
+          return NextResponse.json(
+            { error: "Game already started" },
+            { status: 400 },
+          );
         }
 
         const players = await getPlayers(targetRoomId);
@@ -140,9 +162,17 @@ export async function POST(request: Request) {
 
       // ── Leave Room ─────────────────────────────────────────
       case "leaveRoom": {
-        if (!roomId) return NextResponse.json({ error: "Missing roomId" }, { status: 400 });
+        if (!roomId)
+          return NextResponse.json(
+            { error: "Missing roomId" },
+            { status: 400 },
+          );
         const room = await getRoom(roomId);
-        if (!room) return NextResponse.json({ error: "Room not found" }, { status: 404 });
+        if (!room)
+          return NextResponse.json(
+            { error: "Room not found" },
+            { status: 404 },
+          );
 
         const players = await getPlayers(roomId);
         const updated = players.filter((p) => p.user_id !== userId);
@@ -166,37 +196,66 @@ export async function POST(request: Request) {
 
       // ── Get Room Info ──────────────────────────────────────
       case "getRoomInfo": {
-        if (!roomId) return NextResponse.json({ error: "Missing roomId" }, { status: 400 });
+        if (!roomId)
+          return NextResponse.json(
+            { error: "Missing roomId" },
+            { status: 400 },
+          );
         const room = await getRoom(roomId);
-        if (!room) return NextResponse.json({ error: "Room not found" }, { status: 404 });
+        if (!room)
+          return NextResponse.json(
+            { error: "Room not found" },
+            { status: 404 },
+          );
         const [players, gameState] = await Promise.all([
           getPlayers(roomId),
           getGameState(roomId),
         ]);
-        return NextResponse.json({ room, players, gameState: gameState ?? null });
+        return NextResponse.json({
+          room,
+          players,
+          gameState: gameState ?? null,
+        });
       }
 
       // ── Start Game ─────────────────────────────────────────
       case "startGame": {
-        if (!roomId) return NextResponse.json({ error: "Missing roomId" }, { status: 400 });
+        if (!roomId)
+          return NextResponse.json(
+            { error: "Missing roomId" },
+            { status: 400 },
+          );
         const room = await getRoom(roomId);
-        if (!room) return NextResponse.json({ error: "Room not found" }, { status: 404 });
+        if (!room)
+          return NextResponse.json(
+            { error: "Room not found" },
+            { status: 404 },
+          );
         if (room.creator_id !== userId) {
-          return NextResponse.json({ error: "Only creator can start" }, { status: 403 });
+          return NextResponse.json(
+            { error: "Only creator can start" },
+            { status: 403 },
+          );
         }
 
         const players = await getPlayers(roomId);
 
         if (room.state === "playing") {
           const game = await getGameState(roomId);
-          return NextResponse.json({ room, players, boardTiles: game?.board_tiles || [] });
+          return NextResponse.json({
+            room,
+            players,
+            boardTiles: game?.board_tiles || [],
+          });
         }
 
         const totalSteps = 40;
         const eventDensity = room.event_density || 40;
         const boardTiles = Array.from({ length: totalSteps }).map((_, i) => {
           if (i % (totalSteps / room.num_players) < 2) return { id: "SAFE" };
-          return Math.random() * 100 < eventDensity ? { id: "CUSTOM" } : { id: "SAFE" };
+          return Math.random() * 100 < eventDensity
+            ? { id: "CUSTOM" }
+            : { id: "SAFE" };
         });
 
         const gameState: GameState = {
@@ -219,18 +278,31 @@ export async function POST(request: Request) {
         await broadcast(roomId, "players_update", players);
         await broadcast(roomId, "game_update", gameState);
 
-        console.log(`🎮 Game started: ${room.room_code} (${players.length} players)`);
+        console.log(
+          `🎮 Game started: ${room.room_code} (${players.length} players)`,
+        );
         return NextResponse.json({ room, players, boardTiles });
       }
 
       // ── Roll Dice ──────────────────────────────────────────
       case "rollDice": {
-        if (!roomId) return NextResponse.json({ error: "Missing roomId" }, { status: 400 });
+        if (!roomId)
+          return NextResponse.json(
+            { error: "Missing roomId" },
+            { status: 400 },
+          );
         const gameState = await getGameState(roomId);
-        if (!gameState) return NextResponse.json({ error: "Game not started" }, { status: 400 });
+        if (!gameState)
+          return NextResponse.json(
+            { error: "Game not started" },
+            { status: 400 },
+          );
 
         const diceCount = payload.diceCount || 1;
-        const diceResults = Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1);
+        const diceResults = Array.from(
+          { length: diceCount },
+          () => Math.floor(Math.random() * 6) + 1,
+        );
         const diceValue = diceResults.reduce((a, b) => a + b, 0);
 
         gameState.dice_value = diceValue;
@@ -239,18 +311,30 @@ export async function POST(request: Request) {
 
         await setGameState(roomId, gameState);
         await broadcast(roomId, "game_update", gameState);
-        return NextResponse.json({ diceValue, diceResults, turn: gameState.turn });
+        return NextResponse.json({
+          diceValue,
+          diceResults,
+          turn: gameState.turn,
+        });
       }
 
       // ── Move Player ────────────────────────────────────────
       case "movePlayer": {
-        if (!roomId) return NextResponse.json({ error: "Missing roomId" }, { status: 400 });
+        if (!roomId)
+          return NextResponse.json(
+            { error: "Missing roomId" },
+            { status: 400 },
+          );
         const players = await getPlayers(roomId);
         const movingPlayer = players.find((p) => p.user_id === userId);
-        if (!movingPlayer) return NextResponse.json({ error: "Not in room" }, { status: 403 });
+        if (!movingPlayer)
+          return NextResponse.json({ error: "Not in room" }, { status: 403 });
 
         const { position, lapCount, targetPlayerIndex } = payload;
-        const targetIdx = targetPlayerIndex !== undefined ? targetPlayerIndex : movingPlayer.player_index;
+        const targetIdx =
+          targetPlayerIndex !== undefined
+            ? targetPlayerIndex
+            : movingPlayer.player_index;
         const target = players.find((p) => p.player_index === targetIdx);
         if (target) {
           target.position = position;
@@ -264,9 +348,17 @@ export async function POST(request: Request) {
 
       // ── Trigger Event ──────────────────────────────────────
       case "triggerEvent": {
-        if (!roomId) return NextResponse.json({ error: "Missing roomId" }, { status: 400 });
+        if (!roomId)
+          return NextResponse.json(
+            { error: "Missing roomId" },
+            { status: 400 },
+          );
         const gameState = await getGameState(roomId);
-        if (!gameState) return NextResponse.json({ error: "Game not started" }, { status: 400 });
+        if (!gameState)
+          return NextResponse.json(
+            { error: "Game not started" },
+            { status: 400 },
+          );
 
         gameState.active_event = payload.event;
         gameState.phase = "event";
@@ -278,28 +370,43 @@ export async function POST(request: Request) {
 
       // ── Use Card ───────────────────────────────────────────
       case "useCard": {
-        if (!roomId) return NextResponse.json({ error: "Missing roomId" }, { status: 400 });
+        if (!roomId)
+          return NextResponse.json(
+            { error: "Missing roomId" },
+            { status: 400 },
+          );
         const [players, gameState] = await Promise.all([
           getPlayers(roomId),
           getGameState(roomId),
         ]);
-        if (!gameState) return NextResponse.json({ error: "Game not started" }, { status: 400 });
+        if (!gameState)
+          return NextResponse.json(
+            { error: "Game not started" },
+            { status: 400 },
+          );
 
         const { cardEffect } = payload;
         const { playerUpdates = [], card } = cardEffect || {};
         for (const update of playerUpdates) {
-          const target = players.find((p) => p.player_index === update.playerIndex);
+          const target = players.find(
+            (p) => p.player_index === update.playerIndex,
+          );
           if (target) {
-            if (update.position !== undefined) target.position = update.position;
+            if (update.position !== undefined)
+              target.position = update.position;
             if (update.lap !== undefined) target.lap = update.lap;
-            if (update.skipTurn !== undefined) target.skip_turn = update.skipTurn;
+            if (update.skipTurn !== undefined)
+              target.skip_turn = update.skipTurn;
           }
         }
 
         gameState.active_card = card;
         gameState.phase = "playing";
 
-        await Promise.all([setPlayers(roomId, players), setGameState(roomId, gameState)]);
+        await Promise.all([
+          setPlayers(roomId, players),
+          setGameState(roomId, gameState),
+        ]);
         await broadcast(roomId, "players_update", players);
         await broadcast(roomId, "game_update", gameState);
         return NextResponse.json({ success: true });
@@ -307,13 +414,25 @@ export async function POST(request: Request) {
 
       // ── End Player Turn ────────────────────────────────────
       case "endPlayerTurn": {
-        if (!roomId) return NextResponse.json({ error: "Missing roomId" }, { status: 400 });
+        if (!roomId)
+          return NextResponse.json(
+            { error: "Missing roomId" },
+            { status: 400 },
+          );
         const [room, gameState] = await Promise.all([
           getRoom(roomId),
           getGameState(roomId),
         ]);
-        if (!room) return NextResponse.json({ error: "Room not found" }, { status: 404 });
-        if (!gameState) return NextResponse.json({ error: "Game not started" }, { status: 400 });
+        if (!room)
+          return NextResponse.json(
+            { error: "Room not found" },
+            { status: 404 },
+          );
+        if (!gameState)
+          return NextResponse.json(
+            { error: "Game not started" },
+            { status: 400 },
+          );
 
         const nextTurn = (gameState.turn + 1) % room.num_players;
         gameState.turn = nextTurn;
@@ -325,13 +444,19 @@ export async function POST(request: Request) {
 
         await setGameState(roomId, gameState);
         await broadcast(roomId, "game_update", gameState);
-        console.log(`♻️ Turn ended in ${room.room_code}, next: Player ${nextTurn + 1}`);
+        console.log(
+          `♻️ Turn ended in ${room.room_code}, next: Player ${nextTurn + 1}`,
+        );
         return NextResponse.json({ turn: nextTurn, phase: "playing" });
       }
 
       // ── Set Winner ─────────────────────────────────────────
       case "setWinner": {
-        if (!roomId) return NextResponse.json({ error: "Missing roomId" }, { status: 400 });
+        if (!roomId)
+          return NextResponse.json(
+            { error: "Missing roomId" },
+            { status: 400 },
+          );
         const { winnerIndex } = payload;
         const [room, gameState] = await Promise.all([
           getRoom(roomId),
@@ -355,27 +480,48 @@ export async function POST(request: Request) {
 
       // ── Update Room Config ─────────────────────────────────
       case "updateRoomConfig": {
-        if (!roomId) return NextResponse.json({ error: "Missing roomId" }, { status: 400 });
+        if (!roomId)
+          return NextResponse.json(
+            { error: "Missing roomId" },
+            { status: 400 },
+          );
         const room = await getRoom(roomId);
-        if (!room) return NextResponse.json({ error: "Room not found" }, { status: 404 });
+        if (!room)
+          return NextResponse.json(
+            { error: "Room not found" },
+            { status: 404 },
+          );
         if (room.creator_id !== userId) {
-          return NextResponse.json({ error: "Only creator can update" }, { status: 403 });
+          return NextResponse.json(
+            { error: "Only creator can update" },
+            { status: 403 },
+          );
         }
         if (room.state === "playing") {
-          return NextResponse.json({ error: "Cannot update while playing" }, { status: 400 });
+          return NextResponse.json(
+            { error: "Cannot update while playing" },
+            { status: 400 },
+          );
         }
 
         const { config } = payload;
         const players = await getPlayers(roomId);
         if (config.num_players && config.num_players < players.length) {
-          return NextResponse.json({ error: `Cannot reduce to ${config.num_players} (${players.length} already joined)` }, { status: 400 });
+          return NextResponse.json(
+            {
+              error: `Cannot reduce to ${config.num_players} (${players.length} already joined)`,
+            },
+            { status: 400 },
+          );
         }
 
         if (config.num_players) room.num_players = config.num_players;
         if (config.dice_count) room.dice_count = config.dice_count;
         if (config.laps_to_win) room.laps_to_win = config.laps_to_win;
-        if (config.initial_cards !== undefined) room.initial_cards = config.initial_cards;
-        if (config.event_density !== undefined) room.event_density = config.event_density;
+        if (config.initial_cards !== undefined)
+          room.initial_cards = config.initial_cards;
+        if (config.event_density !== undefined)
+          room.event_density = config.event_density;
         room.updated_at = new Date().toISOString();
 
         await setRoom(room);
@@ -384,10 +530,16 @@ export async function POST(request: Request) {
       }
 
       default:
-        return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
+        return NextResponse.json(
+          { error: `Unknown action: ${action}` },
+          { status: 400 },
+        );
     }
   } catch (err: any) {
     console.error(`[/api/game] Error in ${action}:`, err);
-    return NextResponse.json({ error: err.message || "Internal error" }, { status: 500 });
+    return NextResponse.json(
+      { error: err.message || "Internal error" },
+      { status: 500 },
+    );
   }
 }

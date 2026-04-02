@@ -82,13 +82,23 @@ export async function getRoom(roomId: string): Promise<RoomInfo | null> {
   return (await getKv()).get<RoomInfo>(`room:${roomId}`);
 }
 export async function setRoom(room: RoomInfo): Promise<void> {
-  if (!USE_REDIS) { memRooms.set(room.id, room); return; }
+  if (!USE_REDIS) {
+    memRooms.set(room.id, room);
+    return;
+  }
   await (await getKv()).set(`room:${room.id}`, room, { ex: TTL });
 }
 export async function deleteRoom(room: RoomInfo): Promise<void> {
-  if (!USE_REDIS) { memRooms.delete(room.id); memCodes.delete(room.room_code); return; }
+  if (!USE_REDIS) {
+    memRooms.delete(room.id);
+    memCodes.delete(room.room_code);
+    return;
+  }
   const kv = await getKv();
-  await Promise.all([kv.del(`room:${room.id}`), kv.del(`code:${room.room_code}`)]);
+  await Promise.all([
+    kv.del(`room:${room.id}`),
+    kv.del(`code:${room.room_code}`),
+  ]);
 }
 
 // ── Room code lookup ──────────────────────────────────────────────
@@ -97,7 +107,10 @@ export async function getRoomIdByCode(code: string): Promise<string | null> {
   return (await getKv()).get<string>(`code:${code}`);
 }
 export async function setRoomCode(code: string, roomId: string): Promise<void> {
-  if (!USE_REDIS) { memCodes.set(code, roomId); return; }
+  if (!USE_REDIS) {
+    memCodes.set(code, roomId);
+    return;
+  }
   await (await getKv()).set(`code:${code}`, roomId, { ex: TTL });
 }
 
@@ -106,12 +119,21 @@ export async function getPlayers(roomId: string): Promise<RoomPlayer[]> {
   if (!USE_REDIS) return memPlayers.get(roomId) ?? [];
   return (await (await getKv()).get<RoomPlayer[]>(`players:${roomId}`)) ?? [];
 }
-export async function setPlayers(roomId: string, players: RoomPlayer[]): Promise<void> {
-  if (!USE_REDIS) { memPlayers.set(roomId, players); return; }
+export async function setPlayers(
+  roomId: string,
+  players: RoomPlayer[],
+): Promise<void> {
+  if (!USE_REDIS) {
+    memPlayers.set(roomId, players);
+    return;
+  }
   await (await getKv()).set(`players:${roomId}`, players, { ex: TTL });
 }
 export async function deletePlayers(roomId: string): Promise<void> {
-  if (!USE_REDIS) { memPlayers.delete(roomId); return; }
+  if (!USE_REDIS) {
+    memPlayers.delete(roomId);
+    return;
+  }
   await (await getKv()).del(`players:${roomId}`);
 }
 
@@ -120,12 +142,21 @@ export async function getGameState(roomId: string): Promise<GameState | null> {
   if (!USE_REDIS) return memGames.get(roomId) ?? null;
   return (await getKv()).get<GameState>(`game:${roomId}`);
 }
-export async function setGameState(roomId: string, state: GameState): Promise<void> {
-  if (!USE_REDIS) { memGames.set(roomId, state); return; }
+export async function setGameState(
+  roomId: string,
+  state: GameState,
+): Promise<void> {
+  if (!USE_REDIS) {
+    memGames.set(roomId, state);
+    return;
+  }
   await (await getKv()).set(`game:${roomId}`, state, { ex: TTL });
 }
 export async function deleteGameState(roomId: string): Promise<void> {
-  if (!USE_REDIS) { memGames.delete(roomId); return; }
+  if (!USE_REDIS) {
+    memGames.delete(roomId);
+    return;
+  }
   await (await getKv()).del(`game:${roomId}`);
 }
 
