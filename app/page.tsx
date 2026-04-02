@@ -418,7 +418,7 @@ export default function App() {
         color: COLORS[rp.color_index % COLORS.length],
         pos: -1,
         lap: 0,
-        startPos: 0,
+        startPos: 10 * rp.player_index,
         shield: false,
         skipTurn: false,
         cards: Array.from({ length: room.initial_cards || initialCards }).map(
