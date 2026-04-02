@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Play, Copy, Check, X, LogOut, Settings } from "lucide-react";
 import type { Translations } from "@/app/locales";
-import { useRoom, type RoomInfo, type RoomPlayer } from "@/app/hooks/useRoomWs";
+import { useRoom, type RoomInfo, type RoomPlayer } from "@/app/hooks/useRoomAbly";
 
 interface RoomLobbyProps {
   roomId: string;
