@@ -125,6 +125,7 @@ export function useRoom(userId: string | null): UseRoomReturn {
   const [error, setError] = useState<string | null>(null);
   const channelRef = useRef<Ably.RealtimeChannel | null>(null);
   const roomIdRef = useRef<string | null>(null);
+  const handlersRef = useRef<{ onRoom: any; onPlayers: any; onGame: any } | null>(null);
 
   const isCreator = !!(userId && room?.creator_id === userId);
 
@@ -133,10 +134,13 @@ export function useRoom(userId: string | null): UseRoomReturn {
     if (!userId || !room?.id) return;
     if (roomIdRef.current === room.id) return; // already subscribed
 
-    // Unsubscribe from old channel
-    if (channelRef.current) {
-      channelRef.current.unsubscribe();
+    // Unsubscribe from old channel (only OUR handlers)
+    if (channelRef.current && handlersRef.current) {
+      channelRef.current.unsubscribe("room_update", handlersRef.current.onRoom);
+      channelRef.current.unsubscribe("players_update", handlersRef.current.onPlayers);
+      channelRef.current.unsubscribe("game_update", handlersRef.current.onGame);
       channelRef.current = null;
+      handlersRef.current = null;
     }
 
     const ably = getAbly(userId);
@@ -144,12 +148,21 @@ export function useRoom(userId: string | null): UseRoomReturn {
     channelRef.current = channel;
     roomIdRef.current = room.id;
 
-    channel.subscribe("room_update", (msg) => setRoom(msg.data));
-    channel.subscribe("players_update", (msg) => setPlayers(msg.data));
-    channel.subscribe("game_update", (msg) => setGameState(msg.data));
+    // Store specific handler references so we only remove OUR handlers
+    // (channel.unsubscribe() with no args removes ALL handlers including other hook instances)
+    const onRoom = (msg: any) => setRoom(msg.data);
+    const onPlayers = (msg: any) => setPlayers(msg.data);
+    const onGame = (msg: any) => setGameState(msg.data);
+    handlersRef.current = { onRoom, onPlayers, onGame };
+
+    channel.subscribe("room_update", onRoom);
+    channel.subscribe("players_update", onPlayers);
+    channel.subscribe("game_update", onGame);
 
     return () => {
-      channel.unsubscribe();
+      channel.unsubscribe("room_update", onRoom);
+      channel.unsubscribe("players_update", onPlayers);
+      channel.unsubscribe("game_update", onGame);
       channelRef.current = null;
       roomIdRef.current = null;
     };
@@ -357,10 +370,17 @@ export function useRoom(userId: string | null): UseRoomReturn {
       if (!userId) return () => {};
       const ably = getAbly(userId);
       const channel = ably.channels.get(`game:${rId}`);
-      channel.subscribe("room_update", (msg) => setRoom(msg.data));
-      channel.subscribe("players_update", (msg) => setPlayers(msg.data));
-      channel.subscribe("game_update", (msg) => setGameState(msg.data));
-      return () => channel.unsubscribe();
+      const onRoom = (msg: any) => setRoom(msg.data);
+      const onPlayers = (msg: any) => setPlayers(msg.data);
+      const onGame = (msg: any) => setGameState(msg.data);
+      channel.subscribe("room_update", onRoom);
+      channel.subscribe("players_update", onPlayers);
+      channel.subscribe("game_update", onGame);
+      return () => {
+        channel.unsubscribe("room_update", onRoom);
+        channel.unsubscribe("players_update", onPlayers);
+        channel.unsubscribe("game_update", onGame);
+      };
     },
     [userId],
   );
