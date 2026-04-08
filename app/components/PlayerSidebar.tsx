@@ -83,7 +83,8 @@ export default function PlayerSidebar({
               className="relative bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 transition-all duration-300 hover:bg-white/15 mt-2"
               style={{
                 boxShadow: i === turn ? `0 0 20px ${COLORS[i].hex}` : "none",
-                opacity: p.finished ? 0.75 : 1,
+                opacity: p.finished ? 0.75 : p.activelyLeft ? 0.35 : 1,
+                filter: p.activelyLeft ? "grayscale(0.8)" : "none",
               }}>
               {/* Turn Indicator */}
               {i === turn && (
@@ -113,6 +114,11 @@ export default function PlayerSidebar({
               {p.finished && (
                 <div className="absolute top-1 left-2 text-xs text-yellow-300 font-bold">
                   ✓完赛
+                </div>
+              )}
+              {p.activelyLeft && (
+                <div className="absolute top-1 left-2 text-xs text-red-400 font-bold">
+                  🚶退出
                 </div>
               )}
 
@@ -179,6 +185,8 @@ export default function PlayerSidebar({
               className="relative bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg px-3 py-2.5 min-w-[155px] flex-shrink-0 text-xs flex gap-2.5 items-center"
               style={{
                 boxShadow: i === turn ? `0 0 12px ${COLORS[i].hex}` : "none",
+                opacity: p.activelyLeft ? 0.35 : 1,
+                filter: p.activelyLeft ? "grayscale(0.8)" : "none",
               }}>
               {/* Turn Indicator */}
               {i === turn && (

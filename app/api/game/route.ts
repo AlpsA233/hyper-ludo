@@ -183,10 +183,50 @@ export async function POST(request: Request) {
 
         const players = await getPlayers(roomId);
         const leavingPlayer = players.find((p) => p.user_id === userId);
-        const updated = players.filter((p) => p.user_id !== userId);
+        if (!leavingPlayer) return NextResponse.json({ success: true });
 
-        if (updated.length === 0) {
-          // Last player left — delete everything
+        // ── Waiting room: physically remove the player ─────────
+        if (room.state !== "playing") {
+          const updated = players.filter((p) => p.user_id !== userId);
+          if (updated.length === 0) {
+            await Promise.all([
+              deleteRoom(room),
+              deletePlayers(roomId),
+              deleteGameState(roomId),
+            ]);
+          } else {
+            room.current_players = updated.length;
+            room.updated_at = new Date().toISOString();
+            await Promise.all([setRoom(room), setPlayers(roomId, updated)]);
+            await broadcast(roomId, "players_update", updated);
+            await broadcast(roomId, "room_update", room);
+          }
+          return NextResponse.json({ success: true });
+        }
+
+        // ── Playing: mark as actively_left, keep in array ─────
+        // How many active players remain after this leave?
+        const activeAfterLeave = players.filter(
+          (p) => !p.actively_left && !p.disconnected && p.user_id !== userId,
+        );
+
+        // Rank assignment: first to leave = N (last place), next = N-1, etc.
+        const alreadyLeftCount = players.filter((p) => p.actively_left).length;
+        leavingPlayer.actively_left = true;
+        leavingPlayer.finish_rank = players.length - alreadyLeftCount;
+
+        // Add to banned-re-join list
+        room.actively_left_players = [
+          ...(room.actively_left_players || []),
+          userId,
+        ];
+        // Clear any disconnect entry
+        room.disconnected_players = (room.disconnected_players || []).filter(
+          (d) => d.user_id !== userId,
+        );
+
+        if (activeAfterLeave.length === 0) {
+          // Entire lobby left
           await Promise.all([
             deleteRoom(room),
             deletePlayers(roomId),
@@ -195,20 +235,12 @@ export async function POST(request: Request) {
           return NextResponse.json({ success: true });
         }
 
-        // Mark as actively left (prevents re-joining)
-        room.actively_left_players = [
-          ...(room.actively_left_players || []),
-          userId,
-        ];
-
-        // Clear this player's disconnect entry (they are now permanently gone)
-        room.disconnected_players = (room.disconnected_players || []).filter(
-          (d) => d.user_id !== userId,
-        );
-
-        if (room.state === "playing" && updated.length === 1) {
-          // Only 1 active player left — auto-declare them the winner then clean up
-          const winner = updated[0];
+        if (activeAfterLeave.length === 1) {
+          // Last player standing wins (rank 1)
+          const winner = activeAfterLeave[0];
+          winner.finish_rank = 1;
+          // Broadcast updated player array (with ranks) before win notification
+          await broadcast(roomId, "players_update", players);
           const gameState = await getGameState(roomId);
           if (gameState) {
             gameState.phase = "win";
@@ -223,57 +255,41 @@ export async function POST(request: Request) {
           return NextResponse.json({ success: true });
         }
 
-        room.current_players = updated.length;
+        // Multiple active players remain — resume game for them
+        room.current_players = activeAfterLeave.length;
         room.updated_at = new Date().toISOString();
 
-        // If the game is paused and no more disconnected players remain, resume
         const noMoreDisconnected = !room.disconnected_players?.length;
-        if (noMoreDisconnected) {
-          room.paused_until = undefined;
-        }
+        if (noMoreDisconnected) room.paused_until = undefined;
 
         const gameState = await getGameState(roomId);
-        if (gameState && gameState.phase === "paused" && noMoreDisconnected) {
-          // If it's the leaving player's turn, advance to next active player
-          if (leavingPlayer && gameState.turn === leavingPlayer.player_index) {
-            const activeIndices = updated
+        if (gameState) {
+          const wasLeaversTurn = gameState.turn === leavingPlayer.player_index;
+          const shouldResume =
+            noMoreDisconnected || gameState.phase !== "paused";
+
+          if (wasLeaversTurn) {
+            const activeIndices = activeAfterLeave
               .map((p) => p.player_index)
               .sort((a, b) => a - b);
-            const nextCandidateIdx = activeIndices.findIndex(
+            const nextIdx = activeIndices.findIndex(
               (idx) => idx > leavingPlayer.player_index,
             );
-            gameState.turn =
-              activeIndices[nextCandidateIdx >= 0 ? nextCandidateIdx : 0];
+            gameState.turn = activeIndices[nextIdx >= 0 ? nextIdx : 0];
+            gameState.dice_value = null;
+            gameState.dice_results = null;
           }
-          gameState.phase = "playing";
-          gameState.dice_value = null;
-          gameState.dice_results = null;
-          await setGameState(roomId, gameState);
-          await broadcast(roomId, "game_update", gameState);
-        } else if (
-          gameState &&
-          gameState.phase !== "paused" &&
-          leavingPlayer &&
-          gameState.turn === leavingPlayer.player_index
-        ) {
-          // Not paused, but it was the leaving player's turn — advance
-          const activeIndices = updated
-            .map((p) => p.player_index)
-            .sort((a, b) => a - b);
-          const nextCandidateIdx = activeIndices.findIndex(
-            (idx) => idx > leavingPlayer.player_index,
-          );
-          gameState.turn =
-            activeIndices[nextCandidateIdx >= 0 ? nextCandidateIdx : 0];
-          gameState.phase = "playing";
-          gameState.dice_value = null;
-          gameState.dice_results = null;
+
+          if (gameState.phase === "paused" && shouldResume) {
+            gameState.phase = "playing";
+          }
+
           await setGameState(roomId, gameState);
           await broadcast(roomId, "game_update", gameState);
         }
 
-        await Promise.all([setRoom(room), setPlayers(roomId, updated)]);
-        await broadcast(roomId, "players_update", updated);
+        await Promise.all([setRoom(room), setPlayers(roomId, players)]);
+        await broadcast(roomId, "players_update", players);
         await broadcast(roomId, "room_update", room);
         return NextResponse.json({ success: true });
       }
@@ -527,9 +543,9 @@ export async function POST(request: Request) {
             { status: 400 },
           );
 
-        // Determine which player indices are still active (not disconnected)
+        // Determine which player indices are still active (not disconnected, not actively left)
         const activeIndices = players
-          .filter((p) => !p.disconnected)
+          .filter((p) => !p.disconnected && !p.actively_left)
           .map((p) => p.player_index)
           .sort((a, b) => a - b);
 

@@ -67,6 +67,8 @@ export interface RoomPlayer {
   cards: any[];
   shield: boolean;
   disconnected?: boolean; // temporarily disconnected (not actively left)
+  actively_left?: boolean; // permanently left mid-game
+  finish_rank?: number; // assigned rank when they left
 }
 
 export interface GameState {

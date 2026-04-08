@@ -69,6 +69,7 @@ export interface Player {
   skipTurn: boolean;
   finished?: boolean; // 已完赛（到达目标圈数），仍留在棋盘但跳过其回合
   finishRank?: number; // 完赛排名（1=第一名，2=第二名…）
+  activelyLeft?: boolean; // 主动退出房间，不受卡牌/事件影响，跳过其回合
   cards: Card[];
   avatar?: string; // 玩家头像（emoji或图片URL）
   name?: string; // 玩家名称

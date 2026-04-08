@@ -466,9 +466,13 @@ export function useGameLogic(opts: UseGameLogicOptions) {
       let targets: number[] = [];
       if (card.target === "SELF") targets = [turn];
       else if (card.target === "ALL_OTHERS")
-        targets = newPlayers.map((p) => p.id).filter((id) => id !== turn);
+        targets = newPlayers
+          .map((p) => p.id)
+          .filter((id) => id !== turn && !newPlayers[id]?.activelyLeft);
       else if (card.target === "RANDOM_OTHER") {
-        const others = newPlayers.map((p) => p.id).filter((id) => id !== turn);
+        const others = newPlayers
+          .map((p) => p.id)
+          .filter((id) => id !== turn && !newPlayers[id]?.activelyLeft);
         targets = [others[Math.floor(Math.random() * others.length)]];
       } else if (card.target === "PICK_ONE")
         targets = targetId !== null ? [targetId] : [];

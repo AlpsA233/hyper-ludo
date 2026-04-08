@@ -25,7 +25,9 @@ export default function TargetSelector({
   const [selectedTarget, setSelectedTarget] = useState<number | null>(null);
   const [randomIndex, setRandomIndex] = useState(0);
 
-  const otherPlayers = players.filter((p) => p.id !== currentPlayerId);
+  const otherPlayers = players.filter(
+    (p) => p.id !== currentPlayerId && !p.activelyLeft,
+  );
 
   useEffect(() => {
     if (targetType === "RANDOM_OTHER") {

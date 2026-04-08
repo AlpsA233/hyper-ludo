@@ -39,6 +39,8 @@ export interface RoomPlayer {
   cards?: any[];
   shield?: boolean;
   disconnected?: boolean;
+  actively_left?: boolean;
+  finish_rank?: number;
 }
 
 export interface ReconnectPrompt {

@@ -499,6 +499,7 @@ export default function App() {
               )}
               <button
                 onClick={async () => {
+                  if (isMultiplayer) leaveRoom();
                   if (user) await signOut();
                   setGuestMode(false);
                   setPhase("auth");
@@ -678,7 +679,8 @@ export default function App() {
                   Cancel
                 </button>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
+                    if (isMultiplayer) leaveRoom();
                     setRoomId(null);
                     setIsMultiplayer(false);
                     setCurrentPlayerIndex(null);

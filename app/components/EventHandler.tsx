@@ -67,11 +67,13 @@ export default function EventHandler({
 
     const getAffectedIndices = (): number[] => {
       const target = activeEvent.target || "SELF";
+      // Actively left players are immune to all effects
+      const isActive = (i: number) => !players[i]?.activelyLeft;
       if (target === "ALL_PLAYERS")
-        return Array.from({ length: numPlayers }, (_, i) => i);
+        return Array.from({ length: numPlayers }, (_, i) => i).filter(isActive);
       if (target === "RANDOM_OTHER") {
         const others = Array.from({ length: numPlayers }, (_, i) => i).filter(
-          (i) => i !== turn,
+          (i) => i !== turn && isActive(i),
         );
         return others.length === 0
           ? []

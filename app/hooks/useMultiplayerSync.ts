@@ -209,11 +209,31 @@ export function useMultiplayerSync(opts: UseMultiplayerSyncOptions) {
 
     if (gameState.phase === "win" && phase !== "win") {
       setPlayers((prev) => {
+        const winnerIdx = gameState.active_card?.winnerIndex;
+        const next = [...prev];
+
+        if (winnerIdx !== undefined) {
+          // Auto-win because all others actively left — winner gets rank 1
+          // actively_left players already have finishRank from server sync
+          if (next[winnerIdx] && !next[winnerIdx].finishRank) {
+            next[winnerIdx] = { ...next[winnerIdx], finishRank: 1 };
+          }
+          // Any remaining unranked players (edge cases) fill remaining spots
+          const maxRank = next.length;
+          let rankCursor = 2;
+          next.forEach((p, i) => {
+            if (!p.finishRank && i !== winnerIdx) {
+              next[i] = { ...p, finishRank: rankCursor++ };
+            }
+          });
+          return next;
+        }
+
+        // Natural race completion — sort by lap progress
         const sorted = [...prev]
           .map((p, i) => ({ p, i }))
           .sort((a, b) => b.p.lap - a.p.lap);
         let rank = 1;
-        const next = [...prev];
         sorted.forEach(({ p, i }) => {
           if (p.lap >= lapsToWin)
             next[i] = { ...p, finished: true, finishRank: rank++ };
@@ -254,6 +274,8 @@ export function useMultiplayerSync(opts: UseMultiplayerSyncOptions) {
           lap: rp.lap ?? ep.lap,
           skipTurn: rp.skip_turn ?? ep.skipTurn,
           cards: rp.cards?.length > 0 ? rp.cards : ep.cards,
+          activelyLeft: rp.actively_left ?? ep.activelyLeft,
+          finishRank: rp.finish_rank ?? ep.finishRank,
         };
       });
       return next;
