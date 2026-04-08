@@ -225,6 +225,14 @@ export function useMultiplayerSync(opts: UseMultiplayerSyncOptions) {
       });
       setPhase("win");
     }
+
+    // Pause / resume sync
+    if (gameState.phase === "paused" && phase !== "paused" && phase !== "win") {
+      setPhase("paused");
+    }
+    if (gameState.phase === "playing" && phase === "paused") {
+      setPhase("playing");
+    }
   }, [gameState, isMultiplayer, isMoving, isRolling]);
 
   // ── Sync roomPlayers → local players ─────────────────────

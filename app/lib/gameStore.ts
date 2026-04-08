@@ -47,6 +47,10 @@ export interface RoomInfo {
   current_players: number;
   created_at: string;
   updated_at: string;
+  // Room lifecycle
+  actively_left_players?: string[]; // user_ids permanently banned from re-joining
+  paused_until?: string; // ISO timestamp when pause expires
+  disconnected_players?: Array<{ user_id: string; player_index: number }>;
 }
 
 export interface RoomPlayer {
@@ -62,6 +66,7 @@ export interface RoomPlayer {
   skip_turn: boolean;
   cards: any[];
   shield: boolean;
+  disconnected?: boolean; // temporarily disconnected (not actively left)
 }
 
 export interface GameState {

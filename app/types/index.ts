@@ -12,6 +12,7 @@ export type GamePhase =
   | "config_manager"
   | "library_manager"
   | "event"
+  | "paused"
   | "win";
 
 // 玩家颜色配置

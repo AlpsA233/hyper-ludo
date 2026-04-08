@@ -20,6 +20,9 @@ export interface RoomInfo {
   current_players: number;
   created_at: string;
   updated_at: string;
+  actively_left_players?: string[];
+  paused_until?: string;
+  disconnected_players?: Array<{ user_id: string; player_index: number }>;
 }
 
 export interface RoomPlayer {
@@ -35,6 +38,14 @@ export interface RoomPlayer {
   skip_turn?: boolean;
   cards?: any[];
   shield?: boolean;
+  disconnected?: boolean;
+}
+
+export interface ReconnectPrompt {
+  roomId: string;
+  roomCode: string;
+  playerName: string;
+  pausedUntil: string;
 }
 
 interface UseRoomReturn {
@@ -44,6 +55,9 @@ interface UseRoomReturn {
   gameState: any | null;
   loading: boolean;
   error: string | null;
+  reconnectPrompt: ReconnectPrompt | null;
+  acceptReconnect: () => Promise<void>;
+  declineReconnect: () => Promise<void>;
 
   createRoom: (
     config: {
@@ -126,6 +140,8 @@ export function useRoom(userId: string | null): UseRoomReturn {
   const [gameState, setGameState] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reconnectPrompt, setReconnectPrompt] =
+    useState<ReconnectPrompt | null>(null);
   const channelRef = useRef<Ably.RealtimeChannel | null>(null);
   const roomIdRef = useRef<string | null>(null);
   const handlersRef = useRef<{
@@ -133,8 +149,71 @@ export function useRoom(userId: string | null): UseRoomReturn {
     onPlayers: any;
     onGame: any;
   } | null>(null);
+  // Keep a stable ref to room for beforeunload handler
+  const roomRef = useRef<RoomInfo | null>(null);
+  useEffect(() => {
+    roomRef.current = room;
+  }, [room]);
 
   const isCreator = !!(userId && room?.creator_id === userId);
+
+  // ── Persist room ID to localStorage (for reconnect detection) ─────────
+  useEffect(() => {
+    if (!room?.id) return;
+    localStorage.setItem("hyper_ludo_room_id", room.id);
+    localStorage.setItem("hyper_ludo_room_code", room.room_code);
+  }, [room?.id, room?.room_code]);
+
+  // ── On mount: check for pending reconnect ──────────────────────────────
+  useEffect(() => {
+    if (!userId) return;
+    const storedRoomId = localStorage.getItem("hyper_ludo_room_id");
+    const storedRoomCode = localStorage.getItem("hyper_ludo_room_code");
+    if (!storedRoomId || !storedRoomCode) return;
+
+    // Check if we're still a disconnected player in that room
+    gameAction("getRoomInfo", userId, storedRoomId)
+      .then((result) => {
+        if (!result?.room || !result?.players) return;
+        const me = result.players.find((p: RoomPlayer) => p.user_id === userId);
+        if (!me || !me.disconnected) return;
+        const r: RoomInfo = result.room;
+        if (!r.paused_until) return;
+        // Show reconnect prompt
+        setReconnectPrompt({
+          roomId: storedRoomId,
+          roomCode: storedRoomCode,
+          playerName: me.player_name,
+          pausedUntil: r.paused_until,
+        });
+      })
+      .catch(() => {
+        // Room gone — clear stale storage
+        localStorage.removeItem("hyper_ludo_room_id");
+        localStorage.removeItem("hyper_ludo_room_code");
+      });
+  }, [userId]);
+
+  // ── beforeunload: send disconnect beacon ──────────────────────────────
+  useEffect(() => {
+    if (!userId) return;
+    const handleBeforeUnload = () => {
+      const r = roomRef.current;
+      if (!r || r.state !== "playing") return;
+      const body = JSON.stringify({
+        action: "disconnectPlayer",
+        userId,
+        roomId: r.id,
+        payload: {},
+      });
+      navigator.sendBeacon(
+        "/api/game",
+        new Blob([body], { type: "application/json" }),
+      );
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [userId]);
 
   // Subscribe to Ably channel whenever room.id changes
   useEffect(() => {
@@ -242,6 +321,9 @@ export function useRoom(userId: string | null): UseRoomReturn {
         channelRef.current = null;
         roomIdRef.current = null;
       }
+      // Clear stored room data
+      localStorage.removeItem("hyper_ludo_room_id");
+      localStorage.removeItem("hyper_ludo_room_code");
       setRoom(null);
       setPlayers([]);
       setGameState(null);
@@ -249,6 +331,43 @@ export function useRoom(userId: string | null): UseRoomReturn {
       console.error("Failed to leave room:", err);
       setError(err.message);
     }
+  };
+
+  const acceptReconnect = async (): Promise<void> => {
+    if (!userId || !reconnectPrompt) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await gameAction(
+        "reconnectPlayer",
+        userId,
+        reconnectPrompt.roomId,
+      );
+      setRoom(result.room);
+      setPlayers(result.players);
+      if (result.gameState) setGameState(result.gameState);
+      setReconnectPrompt(null);
+    } catch (err: any) {
+      setError(err.message);
+      // Room no longer exists — clear prompt
+      setReconnectPrompt(null);
+      localStorage.removeItem("hyper_ludo_room_id");
+      localStorage.removeItem("hyper_ludo_room_code");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const declineReconnect = async (): Promise<void> => {
+    if (!userId || !reconnectPrompt) return;
+    try {
+      await gameAction("leaveRoom", userId, reconnectPrompt.roomId);
+    } catch {
+      // Best-effort
+    }
+    localStorage.removeItem("hyper_ludo_room_id");
+    localStorage.removeItem("hyper_ludo_room_code");
+    setReconnectPrompt(null);
   };
 
   const startGame = async (config?: {
@@ -410,6 +529,9 @@ export function useRoom(userId: string | null): UseRoomReturn {
     gameState,
     loading,
     error,
+    reconnectPrompt,
+    acceptReconnect,
+    declineReconnect,
     createRoom,
     joinRoom,
     leaveRoom,
