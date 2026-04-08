@@ -780,7 +780,8 @@ export default function App() {
           players={phase === "win" ? players : []}
           onRestart={() => {
             setEventCounts({});
-            setPhase("setup");
+            setLogs([]);
+            setPhase(isMultiplayer ? "room_lobby" : "setup");
           }}
           onExitRoom={() => {
             if (isMultiplayer) leaveRoom();
@@ -788,6 +789,7 @@ export default function App() {
             setIsMultiplayer(false);
             setCurrentPlayerIndex(null);
             setEventCounts({});
+            setLogs([]);
             setPhase("setup");
           }}
           t={t.game}
