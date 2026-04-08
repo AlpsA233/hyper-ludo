@@ -190,6 +190,15 @@ export interface Translations {
     currentRound: string;
     totalLaps: string;
     lastDice: string;
+    cancel: string;
+    confirmBtn: string;
+    exitRoom: string;
+    lastEliminated: string;
+    playerLeft: string;
+    gamePaused: string;
+    playerDisconnected: string;
+    autoResume: string;
+    leaderboard: string;
   };
 
   // Room (Multiplayer)
@@ -388,6 +397,15 @@ const zh: Translations = {
     currentRound: "当前回合",
     totalLaps: "目标圈数",
     lastDice: "上次掷骰",
+    cancel: "取消",
+    confirmBtn: "确认",
+    exitRoom: "退出房间",
+    lastEliminated: "末位淘汰",
+    playerLeft: "退出",
+    gamePaused: "游戏暂停",
+    playerDisconnected: "有玩家断开连接",
+    autoResume: "若未返回将在 {time} 自动恢复",
+    leaderboard: "排行榜",
   },
   room: {
     lobby: "游戏大厅",
@@ -584,6 +602,15 @@ const en: Translations = {
     currentRound: "Current Turn",
     totalLaps: "Target Laps",
     lastDice: "Last Roll",
+    cancel: "Cancel",
+    confirmBtn: "Confirm",
+    exitRoom: "Exit Room",
+    lastEliminated: "Last Place",
+    playerLeft: "Left",
+    gamePaused: "Game Paused",
+    playerDisconnected: "A player disconnected.",
+    autoResume: "Auto-resumes at {time} if they don't return.",
+    leaderboard: "Leaderboard",
   },
   room: {
     lobby: "Game Lobby",
@@ -794,6 +821,15 @@ const ja: Translations = {
     currentRound: "現在のターン",
     totalLaps: "目標ラップ",
     lastDice: "最後のロール",
+    cancel: "キャンセル",
+    confirmBtn: "確認",
+    exitRoom: "部屋を退出",
+    lastEliminated: "最下位",
+    playerLeft: "退出済み",
+    gamePaused: "ゲーム一時停止",
+    playerDisconnected: "プレイヤーが切断されました。",
+    autoResume: "戻らない場合、{time}に自動再開します。",
+    leaderboard: "ランキング",
   },
   player: "プレイヤー",
   circle: "ラップ",
@@ -992,6 +1028,15 @@ const fr: Translations = {
     currentRound: "Tour actuel",
     totalLaps: "Tours cibles",
     lastDice: "Dernier lancer",
+    cancel: "Annuler",
+    confirmBtn: "Confirmer",
+    exitRoom: "Quitter la salle",
+    lastEliminated: "Dernière place",
+    playerLeft: "Parti(e)",
+    gamePaused: "Jeu en pause",
+    playerDisconnected: "Un joueur s'est déconnecté.",
+    autoResume: "Reprend automatiquement à {time} s'il ne revient pas.",
+    leaderboard: "Classement",
   },
   player: "Joueur",
   circle: "Tour",

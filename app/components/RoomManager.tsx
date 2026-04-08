@@ -139,14 +139,15 @@ export default function RoomManager({
             <button
               onClick={() => setMode("create")}
               className="w-full py-3 px-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-xl font-bold text-white flex items-center justify-center gap-3 transition-all shadow-lg">
-              <Plus size={20} />➕ {t.common.create || "Create Room"}
+              <Plus size={20} />
+              {t.common.create || "Create Room"}
             </button>
 
             <button
               onClick={() => setMode("join")}
               className="w-full py-3 px-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl font-bold text-white flex items-center justify-center gap-3 transition-all shadow-lg">
               <LogIn size={20} />
-              🔗 {t.common.join || "Join Room"}
+              {t.common.join || "Join Room"}
             </button>
 
             {onCancel && (

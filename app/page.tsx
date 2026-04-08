@@ -442,9 +442,20 @@ export default function App() {
 
       <header className="absolute top-0 w-full z-50 p-6 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent backdrop-blur-sm">
         <div className="flex items-center gap-4">
-          {phase !== "setup" && (
+          {phase !== "setup" && phase !== "win" && (
             <button
-              onClick={() => setShowExitConfirm(true)}
+              onClick={() => {
+                if (phase === "playing" || phase === "paused") {
+                  setShowExitConfirm(true);
+                } else {
+                  // Non-game phases: go directly back to setup
+                  if (isMultiplayer) leaveRoom();
+                  setRoomId(null);
+                  setIsMultiplayer(false);
+                  setCurrentPlayerIndex(null);
+                  setPhase("setup");
+                }
+              }}
               className="glass-btn w-10 h-10 rounded-xl flex items-center justify-center text-cyan-400 hover:text-white hover:scale-110 active:scale-95">
               <Home size={20} />
             </button>
@@ -488,28 +499,32 @@ export default function App() {
               ))}
             </div>
           </div>
-          {(user || guestMode) && phase !== "auth" && (
-            <div className="flex items-center gap-2">
-              {user && (
-                <div className="text-xs text-gray-400 hidden sm:block max-w-[120px] truncate">
-                  {user.user_metadata?.name ||
-                    user.user_metadata?.full_name ||
-                    user.email}
-                </div>
-              )}
-              <button
-                onClick={async () => {
-                  if (isMultiplayer) leaveRoom();
-                  if (user) await signOut();
-                  setGuestMode(false);
-                  setPhase("auth");
-                }}
-                className="w-9 h-9 bg-white/10 rounded-lg flex items-center justify-center border border-white/10 hover:bg-red-500/20 transition-colors"
-                title={t.auth.signOut}>
-                <LogOut size={16} />
-              </button>
-            </div>
-          )}
+          {(user || guestMode) &&
+            phase !== "auth" &&
+            phase !== "playing" &&
+            phase !== "paused" &&
+            phase !== "win" && (
+              <div className="flex items-center gap-2">
+                {user && (
+                  <div className="text-xs text-gray-400 hidden sm:block max-w-[120px] truncate">
+                    {user.user_metadata?.name ||
+                      user.user_metadata?.full_name ||
+                      user.email}
+                  </div>
+                )}
+                <button
+                  onClick={async () => {
+                    if (isMultiplayer) leaveRoom();
+                    if (user) await signOut();
+                    setGuestMode(false);
+                    setPhase("auth");
+                  }}
+                  className="w-9 h-9 bg-white/10 rounded-lg flex items-center justify-center border border-white/10 hover:bg-red-500/20 transition-colors"
+                  title={t.auth.signOut}>
+                  <LogOut size={16} />
+                </button>
+              </div>
+            )}
         </div>
       </header>
 
@@ -670,13 +685,13 @@ export default function App() {
             <div className="w-full max-w-[280px] bg-[#0f0f1a] border border-white/10 rounded-2xl p-6 text-center shadow-2xl">
               <AlertTriangle size={40} className="text-red-500 mx-auto mb-4" />
               <h3 className="text-lg font-bold mb-4 italic uppercase">
-                Abort Mission?
+                {t.game.abort}
               </h3>
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowExitConfirm(false)}
                   className="flex-1 py-2 bg-white/5 rounded-lg text-xs font-bold hover:bg-white/10 transition-colors">
-                  Cancel
+                  {t.game.cancel}
                 </button>
                 <button
                   onClick={async () => {
@@ -688,7 +703,7 @@ export default function App() {
                     setShowExitConfirm(false);
                   }}
                   className="flex-1 py-2 bg-red-600 rounded-lg text-xs font-bold uppercase hover:bg-red-500 transition-colors">
-                  Confirm
+                  {t.game.confirmBtn}
                 </button>
               </div>
             </div>
@@ -701,16 +716,17 @@ export default function App() {
             <div className="w-full max-w-[320px] bg-[#0f0f1a] border border-yellow-500/30 rounded-2xl p-8 text-center shadow-2xl">
               <div className="text-4xl mb-4">⏸️</div>
               <h3 className="text-xl font-black italic uppercase text-yellow-400 mb-2">
-                Game Paused
+                {t.game.gamePaused}
               </h3>
               <p className="text-sm text-gray-400 mb-1">
-                A player disconnected.
+                {t.game.playerDisconnected}
               </p>
               {room?.paused_until && (
                 <p className="text-xs text-gray-500">
-                  Auto-resumes{" "}
-                  {new Date(room.paused_until).toLocaleTimeString()} if they
-                  don&apos;t return.
+                  {t.game.autoResume.replace(
+                    "{time}",
+                    new Date(room.paused_until).toLocaleTimeString(),
+                  )}
                 </p>
               )}
             </div>
@@ -762,9 +778,17 @@ export default function App() {
 
         <WinScreen
           players={phase === "win" ? players : []}
-          setPhase={(p) => {
+          onRestart={() => {
             setEventCounts({});
-            setPhase(p);
+            setPhase("setup");
+          }}
+          onExitRoom={() => {
+            if (isMultiplayer) leaveRoom();
+            setRoomId(null);
+            setIsMultiplayer(false);
+            setCurrentPlayerIndex(null);
+            setEventCounts({});
+            setPhase("setup");
           }}
           t={t.game}
         />

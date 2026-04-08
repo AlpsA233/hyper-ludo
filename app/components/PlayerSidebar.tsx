@@ -113,12 +113,12 @@ export default function PlayerSidebar({
               </div>
               {p.finished && (
                 <div className="absolute top-1 left-2 text-xs text-yellow-300 font-bold">
-                  ✓完赛
+                  ✓ {t.victoryAchieved || "完赛"}
                 </div>
               )}
               {p.activelyLeft && (
                 <div className="absolute top-1 left-2 text-xs text-red-400 font-bold">
-                  🚶退出
+                  🚶 {t.playerLeft || "退出"}
                 </div>
               )}
 

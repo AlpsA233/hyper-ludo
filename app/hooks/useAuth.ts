@@ -7,7 +7,7 @@ const GUEST_ID_KEY = "hyper_ludo_guest_id";
 
 function getOrCreateGuestId(): string {
   if (typeof window === "undefined") return "";
-  
+
   let guestId = localStorage.getItem(GUEST_ID_KEY);
   if (!guestId) {
     guestId = "guest_" + crypto.randomUUID();
@@ -95,7 +95,7 @@ export function useAuth() {
 
   const signOut = async () => {
     setError(null);
-    
+
     // Guest 登出只需要清除本地状态
     if (isGuest) {
       localStorage.removeItem(GUEST_ID_KEY);
@@ -103,8 +103,8 @@ export function useAuth() {
       setIsGuest(false);
       return;
     }
-    
-    const { error } = await supabase.auth.signOut();
+
+    const { error } = await supabase.auth.signOut({ scope: "global" });
     if (error) {
       setError(error.message);
       console.error("Sign out error:", error);
