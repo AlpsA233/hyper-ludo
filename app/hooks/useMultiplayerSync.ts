@@ -45,13 +45,40 @@ interface UseMultiplayerSyncOptions {
 
 export function useMultiplayerSync(opts: UseMultiplayerSyncOptions) {
   const {
-    roomId, room, roomPlayers, gameState, isMultiplayer, phase,
-    turn, diceValue, diceResults, lapsToWin, activeEvent, currentPlayerIndex,
-    isMoving, isRolling, effectiveUserId, initialCards,
-    setIsMultiplayer, setCurrentPlayerIndex, setNumPlayers, setDiceCount,
-    setLapsToWin, setInitialCards, setEventDensity, setPlayers, setTurn,
-    setBoardTiles, setPhase, setDiceValue, setDiceResults, setActiveEvent,
-    subscribe, addLog, cardDatabase, userData,
+    roomId,
+    room,
+    roomPlayers,
+    gameState,
+    isMultiplayer,
+    phase,
+    turn,
+    diceValue,
+    diceResults,
+    lapsToWin,
+    activeEvent,
+    currentPlayerIndex,
+    isMoving,
+    isRolling,
+    effectiveUserId,
+    initialCards,
+    setIsMultiplayer,
+    setCurrentPlayerIndex,
+    setNumPlayers,
+    setDiceCount,
+    setLapsToWin,
+    setInitialCards,
+    setEventDensity,
+    setPlayers,
+    setTurn,
+    setBoardTiles,
+    setPhase,
+    setDiceValue,
+    setDiceResults,
+    setActiveEvent,
+    subscribe,
+    addLog,
+    cardDatabase,
+    userData,
   } = opts;
 
   // ── Subscribe & cleanup ───────────────────────────────────
@@ -72,7 +99,8 @@ export function useMultiplayerSync(opts: UseMultiplayerSyncOptions) {
 
   // ── Compute current player index ─────────────────────────
   useEffect(() => {
-    if (!roomId || !room || roomPlayers.length === 0 || !effectiveUserId) return;
+    if (!roomId || !room || roomPlayers.length === 0 || !effectiveUserId)
+      return;
     const idx = roomPlayers.findIndex((p) => p.user_id === effectiveUserId);
     setCurrentPlayerIndex(idx >= 0 ? idx : null);
   }, [roomPlayers, effectiveUserId, room, roomId]);
@@ -103,18 +131,20 @@ export function useMultiplayerSync(opts: UseMultiplayerSyncOptions) {
           startPos: 10 * rp.player_index,
           shield: false,
           skipTurn: false,
-          cards: Array.from({ length: room.initial_cards || initialCards }).map(() => {
-            const base = cardDb[Math.floor(Math.random() * cardDb.length)];
-            return {
-              id: base.id,
-              rarity: base.rarity as "NR" | "R" | "SR" | "SSR",
-              name: base.name,
-              desc: base.desc,
-              pattern: base.pattern,
-              target: base.target,
-              effect: base.effect,
-            };
-          }),
+          cards: Array.from({ length: room.initial_cards || initialCards }).map(
+            () => {
+              const base = cardDb[Math.floor(Math.random() * cardDb.length)];
+              return {
+                id: base.id,
+                rarity: base.rarity as "NR" | "R" | "SR" | "SSR",
+                name: base.name,
+                desc: base.desc,
+                pattern: base.pattern,
+                target: base.target,
+                effect: base.effect,
+              };
+            },
+          ),
           avatar: rp.avatar || ["🔵", "🟣", "🟡", "🟢"][rp.player_index % 4],
           name: rp.player_name || `Player ${rp.player_index + 1}`,
         };
@@ -130,21 +160,33 @@ export function useMultiplayerSync(opts: UseMultiplayerSyncOptions) {
   useEffect(() => {
     if (!gameState || !isMultiplayer) return;
 
-    if (gameState.turn !== undefined && gameState.turn !== turn) setTurn(gameState.turn);
+    if (gameState.turn !== undefined && gameState.turn !== turn)
+      setTurn(gameState.turn);
 
     if (gameState.dice_results?.length > 0) {
-      if (JSON.stringify(gameState.dice_results) !== JSON.stringify(diceResults))
+      if (
+        JSON.stringify(gameState.dice_results) !== JSON.stringify(diceResults)
+      )
         setDiceResults(gameState.dice_results);
     }
-    if (gameState.dice_value !== undefined && gameState.dice_value !== diceValue)
+    if (
+      gameState.dice_value !== undefined &&
+      gameState.dice_value !== diceValue
+    )
       setDiceValue(gameState.dice_value);
 
     if (gameState.phase === "moving" && !isMoving && !isRolling) {
       const r = gameState.dice_results;
-      addLog(`Player ${gameState.turn + 1} rolled ${r?.length === 1 ? gameState.dice_value : r?.join(", ") + ` (总计: ${gameState.dice_value})`}`);
+      addLog(
+        `Player ${gameState.turn + 1} rolled ${r?.length === 1 ? gameState.dice_value : r?.join(", ") + ` (总计: ${gameState.dice_value})`}`,
+      );
     }
 
-    if (gameState.phase === "event" && gameState.active_event && currentPlayerIndex !== gameState.turn) {
+    if (
+      gameState.phase === "event" &&
+      gameState.active_event &&
+      currentPlayerIndex !== gameState.turn
+    ) {
       setActiveEvent({
         id: gameState.active_event.id,
         text: gameState.active_event.text,
@@ -156,21 +198,29 @@ export function useMultiplayerSync(opts: UseMultiplayerSyncOptions) {
       setPhase("event");
     }
 
-    if (gameState.phase === "playing" && !gameState.active_event && activeEvent) {
+    if (
+      gameState.phase === "playing" &&
+      !gameState.active_event &&
+      activeEvent
+    ) {
       setActiveEvent(null);
       if (phase === "event") setPhase("playing");
     }
 
     if (gameState.phase === "win" && phase !== "win") {
       setPlayers((prev) => {
-        const sorted = [...prev].map((p, i) => ({ p, i })).sort((a, b) => b.p.lap - a.p.lap);
+        const sorted = [...prev]
+          .map((p, i) => ({ p, i }))
+          .sort((a, b) => b.p.lap - a.p.lap);
         let rank = 1;
         const next = [...prev];
         sorted.forEach(({ p, i }) => {
-          if (p.lap >= lapsToWin) next[i] = { ...p, finished: true, finishRank: rank++ };
+          if (p.lap >= lapsToWin)
+            next[i] = { ...p, finished: true, finishRank: rank++ };
         });
         const lastIdx = next.findIndex((p) => !p.finished);
-        if (lastIdx !== -1) next[lastIdx] = { ...next[lastIdx], finishRank: next.length };
+        if (lastIdx !== -1)
+          next[lastIdx] = { ...next[lastIdx], finishRank: next.length };
         return next;
       });
       setPhase("win");

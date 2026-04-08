@@ -105,10 +105,15 @@ export default function PlayerSidebar({
                       : "rgba(255,255,255,0.2)",
                   border: "2px solid white",
                 }}>
-                {p.finished ? (["🥇","🥈","🥉"][(p.finishRank ?? 1) - 1] ?? `${p.finishRank}`) : getRankingBadge(rank)}
+                {p.finished
+                  ? (["🥇", "🥈", "🥉"][(p.finishRank ?? 1) - 1] ??
+                    `${p.finishRank}`)
+                  : getRankingBadge(rank)}
               </div>
               {p.finished && (
-                <div className="absolute top-1 left-2 text-xs text-yellow-300 font-bold">✓完赛</div>
+                <div className="absolute top-1 left-2 text-xs text-yellow-300 font-bold">
+                  ✓完赛
+                </div>
               )}
 
               <div className="flex items-center gap-3 mb-3">

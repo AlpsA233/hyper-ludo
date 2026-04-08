@@ -61,7 +61,10 @@ interface UseRoomReturn {
     avatar: string,
   ) => Promise<string>;
   leaveRoom: () => Promise<void>;
-  startGame: (config?: { cardDatabase?: any[]; eventDatabase?: any[] }) => Promise<void>;
+  startGame: (config?: {
+    cardDatabase?: any[];
+    eventDatabase?: any[];
+  }) => Promise<void>;
   rollDice: (diceCount: number) => Promise<any>;
   movePlayer: (
     position: number,
@@ -125,7 +128,11 @@ export function useRoom(userId: string | null): UseRoomReturn {
   const [error, setError] = useState<string | null>(null);
   const channelRef = useRef<Ably.RealtimeChannel | null>(null);
   const roomIdRef = useRef<string | null>(null);
-  const handlersRef = useRef<{ onRoom: any; onPlayers: any; onGame: any } | null>(null);
+  const handlersRef = useRef<{
+    onRoom: any;
+    onPlayers: any;
+    onGame: any;
+  } | null>(null);
 
   const isCreator = !!(userId && room?.creator_id === userId);
 
@@ -137,7 +144,10 @@ export function useRoom(userId: string | null): UseRoomReturn {
     // Unsubscribe from old channel (only OUR handlers)
     if (channelRef.current && handlersRef.current) {
       channelRef.current.unsubscribe("room_update", handlersRef.current.onRoom);
-      channelRef.current.unsubscribe("players_update", handlersRef.current.onPlayers);
+      channelRef.current.unsubscribe(
+        "players_update",
+        handlersRef.current.onPlayers,
+      );
       channelRef.current.unsubscribe("game_update", handlersRef.current.onGame);
       channelRef.current = null;
       handlersRef.current = null;
@@ -241,10 +251,18 @@ export function useRoom(userId: string | null): UseRoomReturn {
     }
   };
 
-  const startGame = async (config?: { cardDatabase?: any[]; eventDatabase?: any[] }): Promise<void> => {
+  const startGame = async (config?: {
+    cardDatabase?: any[];
+    eventDatabase?: any[];
+  }): Promise<void> => {
     if (!room || !userId) return;
     try {
-      const result = await gameAction("startGame", userId, room.id, config || {});
+      const result = await gameAction(
+        "startGame",
+        userId,
+        room.id,
+        config || {},
+      );
       setRoom(result.room);
       setPlayers(result.players);
     } catch (err: any) {
