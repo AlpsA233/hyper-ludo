@@ -151,7 +151,7 @@ export function useMultiplayerSync(opts: UseMultiplayerSyncOptions) {
       });
 
     setPlayers(gamePlayers);
-    setTurn(0);
+    setTurn(gameState.turn ?? 0);
     if (gameState.board_tiles?.length > 0) setBoardTiles(gameState.board_tiles);
     setPhase("playing");
   }, [room?.state, roomId, phase, roomPlayers, gameState]);

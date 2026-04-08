@@ -746,6 +746,9 @@ export default function App() {
                     const promptRoomId = reconnectPrompt.roomId;
                     await acceptReconnect();
                     setRoomId(promptRoomId);
+                    // Trigger useMultiplayerSync init effect which requires phase === "room_lobby"
+                    // to restore players/board and transition to "playing"
+                    setPhase("room_lobby");
                   }}
                   className="flex-1 py-2 bg-cyan-600 rounded-lg text-xs font-bold uppercase hover:bg-cyan-500 transition-colors">
                   Reconnect
